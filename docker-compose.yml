@@ -1,0 +1,29 @@
+services:
+  postgres-db:
+    image: postgres:latest
+    container_name: postgres_secure
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ArchitectPassword2026!
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Best practice: add /data suffix
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  sql-server:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: mssql_secure
+    restart: always
+    user: "10001"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "ArchitectPassword2026!"
+      MSSQL_PID: "Developer"
+    volumes:
+      - mssql_system_data:/var/opt/mssql
+    ports:
+      - "127.0.0.1:1433:1433"
+
+volumes:
+  mssql_system_data:
+  postgres_data:

@@ -1,0 +1,113 @@
+### LLM & Encoding settings ###
+encoding_model: cl100k_base
+
+# Global LLM block (Standard fallback)
+llm:
+  api_key: ollama
+  type: openai_chat
+  model: deepseek-coder-v2:latest
+  api_base: http://localhost:11434/v1
+  model_supports_json: true
+  max_retries: 10
+  request_timeout: 600.0
+  concurrent_requests: 12
+
+# Global Embeddings block
+embeddings:
+  async_mode: threaded
+  concurrent_requests: 20
+  llm:
+    api_key: ollama
+    type: openai_embedding
+    model: nomic-embed-text
+    api_base: http://localhost:11434/v1
+
+### Model Definitions (Matches your Traceback requirements) ###
+completion_models:
+  default_completion_model:
+    model_provider: openai
+    model: qwen3-coder-next:latest
+    api_key: ollama
+    api_base: http://localhost:11434/v1
+    retry:
+      type: exponential_backoff
+
+embedding_models:
+  default_embedding_model:
+    model_provider: openai
+    model: qwen3-embedding:8b
+    api_key: ollama
+    api_base: http://localhost:11434/v1
+    retry:
+      type: exponential_backoff
+
+### Document processing settings ###
+input:
+  type: text
+  base_dir: "input"
+  file_pattern: ".*\\.(cs|js|ts|txt|md|cshtml)"
+  recursive: true
+  encoding: latin-1
+
+chunking:
+  type: tokens
+  size: 1200
+  overlap: 100
+  encoding_model: cl100k_base
+
+### Storage & Cache settings ###
+storage:
+  type: file
+  base_dir: "output"
+
+reporting:
+  type: file
+  base_dir: "output"
+
+cache:
+  type: json
+  storage:
+    type: file
+    base_dir: "cache"
+
+vector_store:
+  type: lancedb
+  db_uri: "output/lancedb"
+
+### Workflow settings (Mapped to completion_models above) ###
+embed_text:
+  embedding_model_id: default_embedding_model
+
+extract_graph:
+  completion_model_id: default_completion_model
+  prompt: "prompts/extract_graph.txt"
+  entity_types: [organization, person, geo, event, software_module]
+  max_gleanings: 1
+
+summarize_descriptions:
+  completion_model_id: default_completion_model
+  prompt: "prompts/summarize_descriptions.txt"
+  max_length: 500
+
+cluster_graph:
+  max_cluster_size: 10
+
+community_reports:
+  completion_model_id: default_completion_model
+  graph_prompt: "prompts/community_report_graph.txt"
+  text_prompt: "prompts/community_report_text.txt"
+  max_length: 2000
+  max_input_length: 8000
+
+### Search / Query settings ###
+local_search:
+  completion_model_id: default_completion_model
+  embedding_model_id: default_embedding_model
+
+global_search:
+  completion_model_id: default_completion_model
+
+### Parallelization (Throttled for stability) ###
+parallelization:
+  stagger: 0.5
+  num_threads: 10

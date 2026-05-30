@@ -1,0 +1,114 @@
+
+Phase 1: Environment Preparation
+# Run from an Elevated (Admin) PowerShell Console
+# Relaxes the execution policy to allow locally written, unsigned scripts to run
+Set-ExecutionPolicy RemoteSigned -Force
+
+
+Phase 2: Credential Vault Ingestion
+# Syntax: cmdkey /add:<ServerName> /user:<TargetServer>\<SambaUser> /pass:<SambaPassword>
+cmdkey /add:gn100-3692 /user:gn100-3692\assilabdulrahim /pass:YOUR_SAMBA_PASSWORD
+
+
+
+Phase 3: The Mapping Script Architecture
+<#
+.SYNOPSIS
+    Maps GN100 Blackwell Samba Shares to local Windows Drive Letters.
+    Bypasses Active Directory Domain Controller lookups.
+#>
+
+$ServerIP = "gn100-3692"
+$Shares = @{
+    "S" = "\\$ServerIP\FileShare"
+    "K" = "\\$ServerIP\KnowledgeBase"
+}
+
+Write-Output "Initializing Safe SMB Mapping Protocol..."
+
+# Step 1: Force clean existing stale or disconnected sessions to avoid drive locks
+foreach ($Drive in $Shares.Keys) {
+    if (Get-PSDrive -Name $Drive -ErrorAction SilentlyContinue) {
+        Remove-PSDrive -Name $Drive -Force -ErrorAction SilentlyContinue
+    }
+    # Clear legacy Windows network routing cache natively
+    net use "${Drive}:" /delete /y 2>$null
+}
+
+# Step 2: Mount shares explicitly using local-node context
+foreach ($Drive in $Shares.Keys) {
+    $RemotePath = $Shares[$Drive]
+    try {
+        Write-Output "Mounting ${RemotePath} to ${Drive}:..."
+        
+        # Explicit user flag inherits the cached credentials from Phase 2 seamlessly
+        net use "${Drive}:" $RemotePath /user:gn100-3692\assilabdulrahim /persistent:yes
+        
+        Write-Output "Successfully mapped ${Drive}:"
+    }
+    catch {
+        Write-Warning "Failed to map ${Drive}: to ${RemotePath}."
+    }
+}
+
+
+### 1. Task Definition Layout (task.xml) File Path: C:\Users\AssilAbdulrahim\source\repos\configurations\task.xml
+
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Author>AssilAbdulrahim</Author>
+    <Description>Maps GN100 Blackwell Samba shares on boot with network delay.</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <Delay>PT30S</Delay>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>true</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Command>
+      <Arguments>-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "C:\Users\AssilAbdulrahim\source\repos\configurations\map_samba_shares.ps1"</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+
+
+### 2. System Registration Execution
+schtasks /create /tn "Map-Samba-Shares" /xml "C:\Users\AssilAbdulrahim\source\repos\configurations\task.xml" /f
+
+Phase 5: Verification & UI Refresh Lifecycle
+# 1. Execute script as a standard user
+& "C:\Users\AssilAbdulrahim\source\repos\configurations\map_samba_shares.ps1"
+
+# 2. Audit that the FileSystem provider sees them
+Get-PSDrive -Name S, K
+
+# 3. Hard-reload the Windows Explorer desktop shell to populate 'This PC' immediately
+Stop-Process -Name explorer -Force
+

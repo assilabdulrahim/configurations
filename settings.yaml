@@ -1,34 +1,16 @@
 ### LLM & Encoding settings ###
 encoding_model: cl100k_base
 
-# Global LLM block (Standard fallback)
-llm:
-  api_key: ollama
-  type: openai_chat
-  model: deepseek-coder-v2:latest
-  api_base: http://localhost:11434/v1
-  model_supports_json: true
-  max_retries: 10
-  request_timeout: 600.0
-  concurrent_requests: 12
-
-# Global Embeddings block
-embeddings:
-  async_mode: threaded
-  concurrent_requests: 20
-  llm:
-    api_key: ollama
-    type: openai_embedding
-    model: nomic-embed-text
-    api_base: http://localhost:11434/v1
-
 ### Model Definitions (Matches your Traceback requirements) ###
 completion_models:
   default_completion_model:
-    model_provider: openai
-    model: qwen3-coder-next:latest
-    api_key: ollama
-    api_base: http://localhost:11434/v1
+    model_provider: openai          # correct — means "OpenAI-compatible protocol",
+                                    # which is how Ollama exposes its /v1 endpoint
+    model: qwen3-coder-next:latest  # your local 80B MoE — good fit for entity
+                                    # extraction over a code-heavy corpus
+    api_key: ollama                 # dummy value; Ollama ignores it, the field
+                                    # just has to exist. Nothing leaves the machine
+    api_base: http://localhost:11434/v1   # local Ollama — the privacy guarantee
     retry:
       type: exponential_backoff
 
@@ -47,7 +29,7 @@ input:
   base_dir: "input"
   file_pattern: ".*\\.(cs|js|ts|txt|md|cshtml)"
   recursive: true
-  encoding: latin-1
+  encoding: utf-8
 
 chunking:
   type: tokens

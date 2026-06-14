@@ -1,38 +1,23 @@
-$Server = "gn100-3692"
-$Shares = @(
-    @{ Letter = "K:"; Path = "\\$Server\KnowledgeBase" },
-    @{ Letter = "F:"; Path = "\\$Server\FileShare" }
-)
+$TaskName = "AutoMapSambaShares"
+$ScriptPath = "C:\Users\AssilAbdulrahim\source\repos\configurations\Mount-SambaShares.ps1"
+$TargetUser = "AssilAbdulrahim"
 
-foreach ($Share in $Shares) {
-    $Drive = $Share.Letter
-    $Target = $Share.Path
+# 1. Purge any old versions to prevent conflicts
+Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
-    # Interrogate existing SMB mappings
-    $Mapping = Get-SmbMapping -LocalPath $Drive -ErrorAction SilentlyContinue
+# 2. Define the Action (Run hidden, bypass execution policy just for this file)
+$Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$ScriptPath`""
 
-    if ($Mapping) {
-        # Verify if the OS can actually traverse the path
-        $IsHealthy = Test-Path -Path $Drive -ErrorAction SilentlyContinue
-        
-        if ($IsHealthy) {
-            Write-Output "STATUS: $Drive is mapped and healthy. Skipping."
-            continue
-        } else {
-            Write-Warning "STATE MISMATCH: $Drive is unresponsive. Purging corrupted connection..."
-            Remove-SmbMapping -LocalPath $Drive -Force -UpdateProfile -ErrorAction SilentlyContinue
-            
-            # Ensure legacy net use handles are also destroyed
-            net use $Drive /delete /y *>$null
-            Start-Sleep -Seconds 2
-        }
-    }
+# 3. Define the Trigger (Execute upon user logon)
+$Trigger = New-ScheduledTaskTrigger -AtLogOn
 
-    Write-Output "ACTION: Mapping $Drive to $Target..."
-    try {
-        New-SmbMapping -LocalPath $Drive -RemotePath $Target -Persistent $true -ErrorAction Stop
-        Write-Output "SUCCESS: $Drive mapped cleanly."
-    } catch {
-        Write-Error "FAILURE: Could not map $Drive. $_"
-    }
-}
+# 4. Define Environment Settings (Wait for network, ignore battery restrictions)
+$Settings = New-ScheduledTaskSettingsSet -RunOnlyIfNetworkAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+
+# 5. Define the Security Principal (Forces interactive logon for your user)
+$Principal = New-ScheduledTaskPrincipal -UserId $TargetUser -LogonType Interactive
+
+# 6. Register the Task
+Register-ScheduledTask -TaskName $TaskName -Action $Action -Trigger $Trigger -Settings $Settings -Principal $Principal
+
+Write-Output "SUCCESS: Scheduled task '$TaskName' has been registered."

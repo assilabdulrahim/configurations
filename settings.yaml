@@ -11,6 +11,18 @@ completion_models:
     api_key: ollama                 # dummy value; Ollama ignores it, the field
                                     # just has to exist. Nothing leaves the machine
     api_base: http://localhost:11434/v1   # local Ollama — the privacy guarantee
+    concurrency: 1                  # FORCE SERIAL PROCESSING
+    request_timeout: 600.0          # 10 minute timeout per request
+    retry:
+      type: exponential_backoff
+
+  answer_model:
+    model_provider: openai
+    model: gemma4:26b
+    api_key: ollama
+    api_base: http://localhost:11434/v1
+    concurrency: 1
+    request_timeout: 600.0
     retry:
       type: exponential_backoff
 
@@ -83,13 +95,17 @@ community_reports:
 
 ### Search / Query settings ###
 local_search:
-  completion_model_id: default_completion_model
+  completion_model_id: answer_model
   embedding_model_id: default_embedding_model
 
 global_search:
-  completion_model_id: default_completion_model
+  completion_model_id: answer_model
 
 ### Parallelization (Throttled for stability) ###
 parallelization:
   stagger: 0.5
   num_threads: 10
+
+basic_search:
+  completion_model_id: answer_model
+  embedding_model_id: default_embedding_model

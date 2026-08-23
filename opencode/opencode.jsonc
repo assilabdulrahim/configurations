@@ -1,0 +1,68 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // ── Your models (unchanged) ──────────────────────────────────
+  "model": "ollama/qwen3-coder-next:latest",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Linux AI Server",
+      "options": {
+        "baseURL": "http://192.168.86.24:11434/v1",
+        "apiKey": "ollama"
+      },
+      "models": {
+        "qwen3-coder-next:latest": { "name": "Qwen3 Coder Next (Remote)" },
+        "deepseek-coder-v2:latest": { "name": "DeepSeek Coder V2 (Remote)" },
+        "llama3.1:70b": { "name": "Llama 3.1 70B (Remote)" },
+        "gemma4:26b": { "name": "Gemma 4 26B (Remote)" }
+      }
+    }
+  },
+
+  // Route through the orchestrator by default. Requires orchestrator.md in
+  // your global agents dir (see notes). If it's missing, OpenCode just
+  // falls back to "build" with a warning — not a fatal error.
+  "default_agent": "orchestrator",
+
+  // ── Permissions (write files / run commands) ─────────────────
+  "permission": {
+    "edit": "allow",
+    "webfetch": "ask",
+    "bash": {
+      "*": "ask",
+      "ls *": "allow",
+      "cat *": "allow",
+      "grep *": "allow",
+      "rg *": "allow",
+      "git status": "allow",
+      "git diff *": "allow",
+      "git log *": "allow",
+      "git add *": "allow",
+      "npm run *": "allow",
+      "git push *": "ask",
+      "npm install *": "ask",
+      "sudo *": "deny",
+      "rm -rf *": "deny"
+    }
+  },
+
+  // ── temperature knobs for the default build agent ────────────
+  // No prompt file here on purpose. Put project-wide rules in AGENTS.md
+  // (auto-loaded) instead of a {file:} reference that can break on a bad path.
+  "agent": {
+    "build": {
+      "temperature": 0.1,
+      "top_p": 0.9
+    }
+  },
+
+  // ── Quality-of-life ──────────────────────────────────────────
+  "formatter": true,
+  "lsp": true,
+  "autoupdate": "notify",
+  "share": "disabled",
+  "watcher": {
+    "ignore": ["node_modules/**", "dist/**", ".git/**"]
+  }
+}

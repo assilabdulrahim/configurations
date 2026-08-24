@@ -1,8 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
 
-  // ── Your models (unchanged) ──────────────────────────────────
-  "model": "ollama/qwen3-coder-next:latest",
+  // ── Your models ──────────────────────────────────────────────
+  // CHANGED (test): was "ollama/qwen3-coder-next:latest".
+  // Pointing at the smallest model that is actually pulled right now,
+  // so a failure shows up in seconds instead of minutes.
+  // Revert to qwen3-coder-next once the path is proven.
+  "model": "ollama/qwen2.5-coder:7b",
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -12,6 +16,8 @@
         "apiKey": "ollama"
       },
       "models": {
+        // ADDED: was missing, so it could not be selected in the UI.
+        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Remote)" },
         "qwen3-coder-next:latest": { "name": "Qwen3 Coder Next (Remote)" },
         "deepseek-coder-v2:latest": { "name": "DeepSeek Coder V2 (Remote)" },
         "llama3.1:70b": { "name": "Llama 3.1 70B (Remote)" },
@@ -20,10 +26,12 @@
     }
   },
 
-  // Route through the orchestrator by default. Requires orchestrator.md in
-  // your global agents dir (see notes). If it's missing, OpenCode just
-  // falls back to "build" with a warning — not a fatal error.
-  "default_agent": "orchestrator",
+  // CHANGED (test): disabled. This is the leading suspect for the hang —
+  // an agent that routes/delegates can leave the GPU busy with nothing
+  // returning to the client. The previous comment here claimed a missing
+  // orchestrator.md degrades to a warning; that claim is unverified.
+  // Re-enable this line ONLY after a plain "hi" round-trips successfully.
+  // "default_agent": "orchestrator",
 
   // ── Permissions (write files / run commands) ─────────────────
   "permission": {

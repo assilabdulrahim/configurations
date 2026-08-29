@@ -24,6 +24,28 @@ Answers three things the router cannot reason its way to:
 Then it marks every agent `OK` or `DEAD`. The router must never route to a
 `DEAD` agent. Exit code is 1 if anything is unreachable.
 
+### The reload warning
+
+The router itself runs on `deepseek/deepseek-v4-pro`, so DeepSeek hitting
+zero stops **every** request, not just DeepSeek-tier ones. Preflight warns
+early and loudly rather than at the moment it fails:
+
+| State | Balance | Exit |
+|---|---|---|
+| `OK` | >= $10 | 0 (or 1 if an agent is unreachable) |
+| `LOW` | < $10 | 2 |
+| `CRITICAL` | < $2 | 2 |
+| `EMPTY` | 0 | 2 |
+
+Anything but `OK` prints a block with the reload URL and the flat-cost
+standby command. Thresholds are env-overridable, which is how you exercise
+the warning without draining an account:
+
+```bash
+DEEPSEEK_LOW_USD=999 node scripts/preflight.cjs      # forces the LOW path
+DEEPSEEK_CRITICAL_USD=999 node scripts/preflight.cjs # forces CRITICAL
+```
+
 ### Honest limits
 
 Only **DeepSeek** publishes a balance endpoint that this can read

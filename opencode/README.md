@@ -92,6 +92,11 @@ validate    free-validator ──▶ reviewer ──▶ validator ──▶ loca
 Every switch is announced. Dead providers are recorded in the ledger so they
 are not retried all session.
 
+**The router's own credit.** It runs on metered DeepSeek, so zero stops
+everything. `preflight.cjs` warns at $10, again at $2, and exits 2 - with
+the reload URL and a flat-cost standby command. The router surfaces that
+notice before anything else in the turn.
+
 **Guard:** falling back on credit can *narrow* the window, so the router
 re-checks context before landing in L0 — a credit fallback that silently
 truncates has traded a billing problem for a correctness problem.

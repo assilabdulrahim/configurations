@@ -22,8 +22,41 @@ const JSON_OUT = process.argv.includes('--json');
 const OLLAMA = 'http://192.168.86.24:11434';
 const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json');
 
-const out = { authed: {}, ollama: null, balances: {}, reachable: {}, agents: {} };
+// The router itself runs on deepseek/deepseek-v4-pro. That is a deliberate
+// choice - see agents/orchestrator.md - and it means DeepSeek hitting zero
+// stops EVERY request, not just the DeepSeek-tier ones. So warn early and
+// loudly rather than at the moment it fails.
+// Overridable so the warning path can be exercised without draining an account:
+//   DEEPSEEK_LOW_USD=999 node scripts/preflight.cjs
+const DEEPSEEK_LOW_USD = Number(process.env.DEEPSEEK_LOW_USD || 10);
+const DEEPSEEK_CRITICAL_USD = Number(process.env.DEEPSEEK_CRITICAL_USD || 2);
+
+const out = { authed: {}, ollama: null, balances: {}, reachable: {}, agents: {}, reload: null };
 const log = (...a) => { if (!JSON_OUT) console.log(...a); };
+
+function reloadNotice(bal, cur, state) {
+  const amount = isNaN(bal) ? 'unknown' : bal.toFixed(2) + ' ' + cur;
+  const head = state === 'EMPTY'
+    ? 'DEEPSEEK IS OUT OF CREDIT'
+    : 'DEEPSEEK CREDIT ' + state + ' - ' + amount + ' left';
+  log('');
+  log('  ' + '='.repeat(68));
+  log('  ** ' + head);
+  log('  ' + '='.repeat(68));
+  log('  The router itself runs on deepseek/deepseek-v4-pro. At zero it stops');
+  log('  and cannot re-route itself, so EVERY request fails - not only the');
+  log('  ones that would have used DeepSeek.');
+  log('');
+  log('  RELOAD:   https://platform.deepseek.com  ->  Top up / Billing');
+  log('');
+  log('  Or move the router to the flat-cost standby (1M context, no metering):');
+  log('    sed -i "s|^model: deepseek/.*|model: kimi-for-coding/k3|" \\');
+  log('      agents/orchestrator.md');
+  log('');
+  log('  Then re-run: node scripts/preflight.cjs');
+  log('  ' + '='.repeat(68));
+  log('');
+}
 
 async function head(url, headers, timeoutMs = 8000) {
   const ac = new AbortController();
@@ -74,10 +107,16 @@ async function head(url, headers, timeoutMs = 8000) {
     if (r.status === 200) {
       const b = JSON.parse(r.body);
       const info = (b.balance_infos || [])[0] || {};
-      out.balances.deepseek = { available: b.is_available, total: info.total_balance, currency: info.currency };
-      log('  ' + (b.is_available ? 'OK  ' : 'LOW ') + ' deepseek        ' +
-        (info.total_balance ?? '?') + ' ' + (info.currency || '') +
-        (b.is_available ? '' : '  <-- TOP UP, router must skip the deepseek tier'));
+      const bal = parseFloat(info.total_balance);
+      const cur = info.currency || '';
+      const state = !b.is_available || !(bal > 0) ? 'EMPTY'
+        : bal < DEEPSEEK_CRITICAL_USD ? 'CRITICAL'
+          : bal < DEEPSEEK_LOW_USD ? 'LOW' : 'OK';
+      out.balances.deepseek = { available: b.is_available, total: bal, currency: cur, state };
+      out.reload = state === 'OK' ? null : state;
+      log('  ' + (state === 'OK' ? 'OK  ' : state.padEnd(4)) + ' deepseek        ' +
+        (isNaN(bal) ? '?' : bal.toFixed(2)) + ' ' + cur);
+      if (state !== 'OK') reloadNotice(bal, cur, state);
     } else log('  ?    deepseek        balance query returned ' + r.status);
   } else log('  -    deepseek        not authenticated');
 
@@ -126,5 +165,6 @@ async function head(url, headers, timeoutMs = 8000) {
   if (JSON_OUT) console.log(JSON.stringify(out, null, 2));
   // exitCode rather than process.exit(): forcing exit while fetch keepalive
   // sockets are still open trips a libuv assertion on Windows.
-  process.exitCode = dead.length ? 1 : 0;
+  // 2 = credit needs reloading (louder than 1, which is just an unusable agent)
+  process.exitCode = out.reload ? 2 : dead.length ? 1 : 0;
 })();

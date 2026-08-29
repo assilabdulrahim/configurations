@@ -259,13 +259,42 @@ Rules:
   providers failed and what would restore service. Do not quietly attempt the
   work yourself.
 
-## Your own model
+## Your own model — the reload warning
 
-You run on `deepseek/deepseek-v4-pro`, which is metered. If DeepSeek runs
-out, **you** stop — you cannot re-route yourself. `preflight.cjs` prints the
-DeepSeek balance for exactly this reason. When it gets low, say so and
-suggest repointing this agent's `model:` to `kimi-for-coding/k3` (1M context,
-flat cost) as the standby.
+You run on `deepseek/deepseek-v4-pro`, which is metered. This is a deliberate
+choice: the router fires on every request, so putting it on a subscription
+would burn quota on turns that produce no code, and it needs the 1M window to
+hold the session.
+
+The consequence is that **DeepSeek hitting zero stops everything.** You
+cannot re-route yourself — every request fails, not only the ones that would
+have used DeepSeek. The user has accepted this trade and keeps DeepSeek
+funded. Your job is to make sure they are never surprised by it.
+
+`preflight.cjs` reports a `reload` state and exits **2** when credit needs
+topping up:
+
+| State | Balance | What you do |
+|---|---|---|
+| `OK` | ≥ $10 | Nothing. Do not mention it. |
+| `LOW` | < $10 | **Surface the reload notice before anything else this turn**, then carry on with the work. |
+| `CRITICAL` | < $2 | Surface it and say plainly that the session may stop mid-task. |
+| `EMPTY` | 0 | Surface it and stop. Do not start work you cannot finish. |
+
+When the state is not `OK`, print the notice `preflight.cjs` produced
+verbatim — it carries the reload URL and the standby command. Lead with it;
+do not bury it under a status report. Say it once per session unless the
+state gets worse.
+
+The standby, if the user would rather not top up right now:
+
+```
+sed -i "s|^model: deepseek/.*|model: kimi-for-coding/k3|" agents/orchestrator.md
+```
+
+That moves you to flat-cost Kimi at 1M context. Offer it as an alternative to
+reloading, never as a silent substitution — changing which model runs the
+router is the user's call, not yours.
 
 ---
 

@@ -1,12 +1,45 @@
 {
   "$schema": "https://opencode.ai/config.json",
 
-  // ── Your models ──────────────────────────────────────────────
-  // CHANGED (test): was "ollama/qwen3-coder-next:latest".
-  // Pointing at the smallest model that is actually pulled right now,
-  // so a failure shows up in seconds instead of minutes.
-  // Revert to qwen3-coder-next once the path is proven.
-  "model": "ollama/qwen2.5-coder:7b",
+  // ── Cost posture ─────────────────────────────────────────────
+  // Three cost classes, cheapest first:
+  //
+  //   LOCAL         Ollama box on the LAN. Free, unlimited, PRIVATE.
+  //                 Weak: 32k-131k context.
+  //   FREE          OpenCode Zen free models (big-pickle, minimax, nemotron,
+  //                 glm, kimi-k2.5-free, deepseek-v4-flash-free, +24 more).
+  //                 Free, 200k-1M context, tool-capable, genuinely strong.
+  //   SUBSCRIPTION  Kimi and Anthropic. Flat cost but FINITE QUOTA.
+  //
+  // The rule the router follows:
+  //
+  //   Default to the free tier. Drop to local only for privacy or trivia.
+  //   Spend subscription quota only when free stalls or stakes are high.
+  //   Never validate a model's work with the same model.
+  //
+  // The free Zen models beat the local box on context and capability at the
+  // same price. Local wins on exactly one axis: the code never leaves the
+  // LAN. The full escalation ladder is in agents/orchestrator.md.
+
+  // Default when no agent is selected. A free OpenRouter model - 1M context,
+  // tool-capable, costs nothing, and openrouter is ALREADY authenticated.
+  // (opencode/big-pickle is the nicer default but needs `opencode auth login`
+  // for the opencode provider first - see scripts/preflight.cjs.)
+  "model": "openrouter/minimax/minimax-m3:free",
+
+  // Title generation / bookkeeping only. Kept local so it never touches quota.
+  "small_model": "ollama/qwen2.5-coder:7b",
+
+  // Every request goes through the router.
+  // Previously disabled while chasing a hang. Cause identified: subagents
+  // were pinned to a model that is not installed (qwen3-coder-next) and to
+  // one with no tool-calling capability (deepseek-coder-v2). Both fixed.
+  "default_agent": "orchestrator",
+
+  // ── Providers ────────────────────────────────────────────────
+  // opencode (Zen), deepseek, moonshotai, kimi-for-coding and anthropic are all
+  // first-class in models.dev - they need `opencode auth login`, not a
+  // provider block. Only the local box needs describing.
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -15,25 +48,83 @@
         "baseURL": "http://192.168.86.24:11434/v1",
         "apiKey": "ollama"
       },
+      // Verified against http://192.168.86.24:11434/api/tags.
+      // Never list a model that is not actually pulled - it surfaces as a
+      // hang, not as a clean error.
       "models": {
-        // ADDED: was missing, so it could not be selected in the UI.
-        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Remote)" },
-        "qwen3-coder-next:latest": { "name": "Qwen3 Coder Next (Remote)" },
-        "deepseek-coder-v2:latest": { "name": "DeepSeek Coder V2 (Remote)" },
-        "llama3.1:70b": { "name": "Llama 3.1 70B (Remote)" },
-        "gemma4:26b": { "name": "Gemma 4 26B (Remote)" }
+        "llama3.1:70b": { "name": "Llama 3.1 70B (Local, 131k, tools)" },
+        "qwen3:32b": { "name": "Qwen3 32B (Local, 40k, tools+thinking)" },
+        "gemma4:26b": { "name": "Gemma 4 26B (Local, tools+thinking)" },
+        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Local, 32k, tools)" }
+        // Deliberately absent:
+        //   deepseek-coder-v2  - capabilities ["completion","insert"], no
+        //                        tool calling, so it cannot drive an agent.
+        //   qwen3-embedding:8b - embedding only.
+        //   qwen3-coder-next   - referenced by the old config, never pulled.
       }
     }
   },
 
-  // CHANGED (test): disabled. This is the leading suspect for the hang —
-  // an agent that routes/delegates can leave the GPU busy with nothing
-  // returning to the client. The previous comment here claimed a missing
-  // orchestrator.md degrades to a warning; that claim is unverified.
-  // Re-enable this line ONLY after a plain "hi" round-trips successfully.
-  // "default_agent": "orchestrator",
+  // ── Context maintenance ──────────────────────────────────────
+  "compaction": {
+    "auto": true,
+    "prune": true,        // drop stale tool output before dropping reasoning
+    "tail_turns": 8
+  },
 
-  // ── Permissions (write files / run commands) ─────────────────
+  // Depth 1: subagents cannot spawn subagents. Deliberate - every hop back
+  // through the router preserves context in one place. Letting specialists
+  // re-delegate fragments the session across contexts nothing reconciles.
+  "subagent_depth": 1,
+
+  // ── Convenience commands ─────────────────────────────────────
+  "command": {
+    "preflight": {
+      "description": "Which providers are authed, what credit is left, which agents are usable",
+      "template": "Run: node scripts/preflight.cjs — then summarise which agents are usable, which are DEAD and why, and any provider that is low on credit."
+    },
+    "ctx": {
+      "description": "Measure how many tokens a path set is, and which tiers hold it",
+      "template": "Run: node scripts/ctx-estimate.cjs $ARGUMENTS — then state the smallest tier reporting FITS and route accordingly."
+    },
+    "doc": {
+      "description": "Write a technical document - design doc, ADR, runbook, README, spec",
+      "agent": "doc-writer",
+      "template": "Invoke the `document` skill. $ARGUMENTS"
+    },
+    "threat-model": {
+      "description": "STRIDE threat model / security review of this repo or a design",
+      "agent": "security-reviewer",
+      "template": "Invoke the `security-review` skill. $ARGUMENTS"
+    },
+    "design": {
+      "description": "Software architecture - boundaries, trade-offs, C4, ADR",
+      "agent": "architect",
+      "template": "Invoke the `architecture` skill. $ARGUMENTS"
+    },
+    "cloud": {
+      "description": "Cloud architecture - topology, networking, resilience, cost, IaC",
+      "agent": "cloud-architect",
+      "template": "Invoke the `cloud-architecture` skill. $ARGUMENTS"
+    },
+    "free": {
+      "description": "Force this task onto the free OpenCode Zen tier",
+      "agent": "free-coder",
+      "template": "$ARGUMENTS"
+    },
+    "validate": {
+      "description": "Cross-model validation of the current diff (never the model that wrote it)",
+      "agent": "validator",
+      "template": "Validate the uncommitted changes in this repo. Read .opencode/handoff.md first to see which model produced them. Report as path:line - problem - suggested fix, then a one-line verdict: PASS or CHANGES-REQUESTED."
+    },
+    "local": {
+      "description": "Force this task onto the local Ollama box - nothing leaves the LAN",
+      "agent": "local-coder",
+      "template": "$ARGUMENTS"
+    }
+  },
+
+  // ── Permissions ──────────────────────────────────────────────
   "permission": {
     "edit": "allow",
     "webfetch": "ask",
@@ -55,9 +146,6 @@
     }
   },
 
-  // ── temperature knobs for the default build agent ────────────
-  // No prompt file here on purpose. Put project-wide rules in AGENTS.md
-  // (auto-loaded) instead of a {file:} reference that can break on a bad path.
   "agent": {
     "build": {
       "temperature": 0.1,
@@ -65,7 +153,6 @@
     }
   },
 
-  // ── Quality-of-life ──────────────────────────────────────────
   "formatter": true,
   "lsp": true,
   "autoupdate": "notify",

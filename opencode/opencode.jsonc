@@ -2,20 +2,30 @@
   "$schema": "https://opencode.ai/config.json",
 
   // ── Cost posture ─────────────────────────────────────────────
-  // Kimi, Anthropic and Gemini are SUBSCRIPTIONS: flat cost, but finite
-  // quota. So the thing being optimised is not dollars-per-token, it is
-  // subscription burn. The rule the router follows:
+  // Three cost classes, cheapest first:
   //
-  //   Use the local Ollama box whenever it can do the job effectively.
-  //   Spend subscription quota only when local genuinely cannot.
+  //   LOCAL         Ollama box on the LAN. Free, unlimited, PRIVATE.
+  //                 Weak: 32k-131k context.
+  //   FREE          OpenCode Zen free models (big-pickle, minimax, nemotron,
+  //                 glm, kimi-k2.5-free, deepseek-v4-flash-free, +24 more).
+  //                 Free, 200k-1M context, tool-capable, genuinely strong.
+  //   SUBSCRIPTION  Kimi and Anthropic. Flat cost but FINITE QUOTA.
+  //
+  // The rule the router follows:
+  //
+  //   Default to the free tier. Drop to local only for privacy or trivia.
+  //   Spend subscription quota only when free stalls or stakes are high.
   //   Never validate a model's work with the same model.
   //
-  // Local is free and private but weak; the escalation ladder is in
-  // agents/orchestrator.md.
+  // The free Zen models beat the local box on context and capability at the
+  // same price. Local wins on exactly one axis: the code never leaves the
+  // LAN. The full escalation ladder is in agents/orchestrator.md.
 
-  // Default when no agent is selected. Local, because most stray prompts
-  // are small. The router overrides this per task.
-  "model": "ollama/qwen3:32b",
+  // Default when no agent is selected. A free OpenRouter model - 1M context,
+  // tool-capable, costs nothing, and openrouter is ALREADY authenticated.
+  // (opencode/big-pickle is the nicer default but needs `opencode auth login`
+  // for the opencode provider first - see scripts/preflight.cjs.)
+  "model": "openrouter/minimax/minimax-m3:free",
 
   // Title generation / bookkeeping only. Kept local so it never touches quota.
   "small_model": "ollama/qwen2.5-coder:7b",
@@ -27,7 +37,7 @@
   "default_agent": "orchestrator",
 
   // ── Providers ────────────────────────────────────────────────
-  // deepseek, moonshotai, kimi-for-coding, anthropic and google are all
+  // opencode (Zen), deepseek, moonshotai, kimi-for-coding and anthropic are all
   // first-class in models.dev - they need `opencode auth login`, not a
   // provider block. Only the local box needs describing.
   "provider": {
@@ -69,6 +79,39 @@
 
   // ── Convenience commands ─────────────────────────────────────
   "command": {
+    "preflight": {
+      "description": "Which providers are authed, what credit is left, which agents are usable",
+      "template": "Run: node scripts/preflight.cjs — then summarise which agents are usable, which are DEAD and why, and any provider that is low on credit."
+    },
+    "ctx": {
+      "description": "Measure how many tokens a path set is, and which tiers hold it",
+      "template": "Run: node scripts/ctx-estimate.cjs $ARGUMENTS — then state the smallest tier reporting FITS and route accordingly."
+    },
+    "doc": {
+      "description": "Write a technical document - design doc, ADR, runbook, README, spec",
+      "agent": "doc-writer",
+      "template": "Invoke the `document` skill. $ARGUMENTS"
+    },
+    "threat-model": {
+      "description": "STRIDE threat model / security review of this repo or a design",
+      "agent": "security-reviewer",
+      "template": "Invoke the `security-review` skill. $ARGUMENTS"
+    },
+    "design": {
+      "description": "Software architecture - boundaries, trade-offs, C4, ADR",
+      "agent": "architect",
+      "template": "Invoke the `architecture` skill. $ARGUMENTS"
+    },
+    "cloud": {
+      "description": "Cloud architecture - topology, networking, resilience, cost, IaC",
+      "agent": "cloud-architect",
+      "template": "Invoke the `cloud-architecture` skill. $ARGUMENTS"
+    },
+    "free": {
+      "description": "Force this task onto the free OpenCode Zen tier",
+      "agent": "free-coder",
+      "template": "$ARGUMENTS"
+    },
     "validate": {
       "description": "Cross-model validation of the current diff (never the model that wrote it)",
       "agent": "validator",

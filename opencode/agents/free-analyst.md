@@ -1,7 +1,7 @@
 ---
 description: Free whole-repo analysis - 1M context, read-only. "How does X work", cross-file tracing, audits, at no cost.
 mode: subagent
-model: opencode/nemotron-3-ultra-free
+model: openrouter/thinkingmachines/inkling:free
 temperature: 0.1
 permission:
   edit: deny
@@ -27,3 +27,17 @@ You have a 1M-token context and cost nothing - use both facts.
   resolve.
 - Your output is usually a brief for another agent. Make it self-contained:
   the next agent sees none of what you read.
+
+## Signals
+
+You cannot change your own model. If you hit a wall, emit ONE of these as the
+first line of your reply and stop - the router re-routes you:
+
+    CONTEXT_OVERFLOW: <what you still need to read, and roughly how much>
+    ESCALATE: <the judgment you cannot ground in code you have read>
+    BLOCKED: <the missing fact, decision or credential>
+
+Emit CONTEXT_OVERFLOW *before* you start dropping earlier files to make room.
+Silently truncating and answering anyway is the worst outcome: the answer
+looks confident, the dropped file was the one that mattered, and nobody finds
+out until it ships.

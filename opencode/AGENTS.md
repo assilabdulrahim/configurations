@@ -165,12 +165,47 @@ that sees the whole session.
 - Never assume knowledge of an earlier turn. If the brief does not contain a
   fact you need, ask for it or go read the file yourself.
 
-# Escalation
+# Signals
 
-Stopping is a valid outcome. If a task exceeds your model's context or needs
-judgment you cannot ground in code you have read, say so plainly and stop.
-The orchestrator will re-route you to a stronger tier. Guessing to avoid
-looking stuck is the failure mode this system exists to prevent.
+You cannot change your own model. When you hit a wall, the router re-routes
+you - but only if you say so in a form it can act on mechanically. Emit
+exactly one of these as the **first line** of your reply, then stop:
+
+```
+CONTEXT_OVERFLOW: <what you still need to read, and roughly how much>
+ESCALATE: <the specific judgment you cannot ground in code you have read>
+BLOCKED: <the missing fact, decision or credential>
+```
+
+## CONTEXT_OVERFLOW
+
+Emit this the moment you can see the job needs more context than you have -
+**before** you start dropping earlier files to make room. Say what remains
+unread and roughly how large it is, so the router can pick a window that
+actually fits instead of guessing again.
+
+Silently truncating and answering anyway is the worst thing you can do. The
+answer looks confident, the missing file was the one that mattered, and
+nobody finds out until it ships.
+
+## ESCALATE
+
+For judgment, not size. Use it when the task turns on a design decision, or
+when you have failed twice on the same problem. Two failed attempts is the
+limit; a third on the same model is waste.
+
+## BLOCKED
+
+For a missing input: an unstated requirement, an unavailable credential, a
+decision only the user can make. Name exactly what you need.
+
+---
+
+Stopping is a valid, valuable outcome. The router escalates you without
+argument - these signals are the system working, not a failure report.
+Guessing to avoid looking stuck is the failure mode this design exists to
+prevent, and it costs more than stopping: a wrong answer still has to be
+validated, bounced, and redone.
 
 # Validation
 

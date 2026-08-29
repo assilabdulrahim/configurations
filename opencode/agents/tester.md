@@ -1,7 +1,7 @@
 ---
 description: Writes and runs tests, diagnoses failures, improves coverage. Use for anything about testing.
 mode: subagent
-model: ollama/deepseek-coder-v2:latest
+model: deepseek/deepseek-v4-flash
 temperature: 0
 permission:
   edit: allow

@@ -1,12 +1,35 @@
 {
   "$schema": "https://opencode.ai/config.json",
 
-  // ── Your models ──────────────────────────────────────────────
-  // CHANGED (test): was "ollama/qwen3-coder-next:latest".
-  // Pointing at the smallest model that is actually pulled right now,
-  // so a failure shows up in seconds instead of minutes.
-  // Revert to qwen3-coder-next once the path is proven.
-  "model": "ollama/qwen2.5-coder:7b",
+  // ── Cost posture ─────────────────────────────────────────────
+  // Kimi, Anthropic and Gemini are SUBSCRIPTIONS: flat cost, but finite
+  // quota. So the thing being optimised is not dollars-per-token, it is
+  // subscription burn. The rule the router follows:
+  //
+  //   Use the local Ollama box whenever it can do the job effectively.
+  //   Spend subscription quota only when local genuinely cannot.
+  //   Never validate a model's work with the same model.
+  //
+  // Local is free and private but weak; the escalation ladder is in
+  // agents/orchestrator.md.
+
+  // Default when no agent is selected. Local, because most stray prompts
+  // are small. The router overrides this per task.
+  "model": "ollama/qwen3:32b",
+
+  // Title generation / bookkeeping only. Kept local so it never touches quota.
+  "small_model": "ollama/qwen2.5-coder:7b",
+
+  // Every request goes through the router.
+  // Previously disabled while chasing a hang. Cause identified: subagents
+  // were pinned to a model that is not installed (qwen3-coder-next) and to
+  // one with no tool-calling capability (deepseek-coder-v2). Both fixed.
+  "default_agent": "orchestrator",
+
+  // ── Providers ────────────────────────────────────────────────
+  // deepseek, moonshotai, kimi-for-coding, anthropic and google are all
+  // first-class in models.dev - they need `opencode auth login`, not a
+  // provider block. Only the local box needs describing.
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -15,25 +38,50 @@
         "baseURL": "http://192.168.86.24:11434/v1",
         "apiKey": "ollama"
       },
+      // Verified against http://192.168.86.24:11434/api/tags.
+      // Never list a model that is not actually pulled - it surfaces as a
+      // hang, not as a clean error.
       "models": {
-        // ADDED: was missing, so it could not be selected in the UI.
-        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Remote)" },
-        "qwen3-coder-next:latest": { "name": "Qwen3 Coder Next (Remote)" },
-        "deepseek-coder-v2:latest": { "name": "DeepSeek Coder V2 (Remote)" },
-        "llama3.1:70b": { "name": "Llama 3.1 70B (Remote)" },
-        "gemma4:26b": { "name": "Gemma 4 26B (Remote)" }
+        "llama3.1:70b": { "name": "Llama 3.1 70B (Local, 131k, tools)" },
+        "qwen3:32b": { "name": "Qwen3 32B (Local, 40k, tools+thinking)" },
+        "gemma4:26b": { "name": "Gemma 4 26B (Local, tools+thinking)" },
+        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Local, 32k, tools)" }
+        // Deliberately absent:
+        //   deepseek-coder-v2  - capabilities ["completion","insert"], no
+        //                        tool calling, so it cannot drive an agent.
+        //   qwen3-embedding:8b - embedding only.
+        //   qwen3-coder-next   - referenced by the old config, never pulled.
       }
     }
   },
 
-  // CHANGED (test): disabled. This is the leading suspect for the hang —
-  // an agent that routes/delegates can leave the GPU busy with nothing
-  // returning to the client. The previous comment here claimed a missing
-  // orchestrator.md degrades to a warning; that claim is unverified.
-  // Re-enable this line ONLY after a plain "hi" round-trips successfully.
-  // "default_agent": "orchestrator",
+  // ── Context maintenance ──────────────────────────────────────
+  "compaction": {
+    "auto": true,
+    "prune": true,        // drop stale tool output before dropping reasoning
+    "tail_turns": 8
+  },
 
-  // ── Permissions (write files / run commands) ─────────────────
+  // Depth 1: subagents cannot spawn subagents. Deliberate - every hop back
+  // through the router preserves context in one place. Letting specialists
+  // re-delegate fragments the session across contexts nothing reconciles.
+  "subagent_depth": 1,
+
+  // ── Convenience commands ─────────────────────────────────────
+  "command": {
+    "validate": {
+      "description": "Cross-model validation of the current diff (never the model that wrote it)",
+      "agent": "validator",
+      "template": "Validate the uncommitted changes in this repo. Read .opencode/handoff.md first to see which model produced them. Report as path:line - problem - suggested fix, then a one-line verdict: PASS or CHANGES-REQUESTED."
+    },
+    "local": {
+      "description": "Force this task onto the local Ollama box - nothing leaves the LAN",
+      "agent": "local-coder",
+      "template": "$ARGUMENTS"
+    }
+  },
+
+  // ── Permissions ──────────────────────────────────────────────
   "permission": {
     "edit": "allow",
     "webfetch": "ask",
@@ -55,9 +103,6 @@
     }
   },
 
-  // ── temperature knobs for the default build agent ────────────
-  // No prompt file here on purpose. Put project-wide rules in AGENTS.md
-  // (auto-loaded) instead of a {file:} reference that can break on a bad path.
   "agent": {
     "build": {
       "temperature": 0.1,
@@ -65,7 +110,6 @@
     }
   },
 
-  // ── Quality-of-life ──────────────────────────────────────────
   "formatter": true,
   "lsp": true,
   "autoupdate": "notify",

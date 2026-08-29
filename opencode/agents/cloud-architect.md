@@ -1,7 +1,7 @@
 ---
 description: Cloud and infrastructure design - architecture, IaC, networking, scaling, cost. Use for infra/design tasks.
 mode: subagent
-model: ollama/llama3.1:70b
+model: moonshotai/kimi-k3
 temperature: 0.2
 permission:
   edit: ask          # IaC edits gated: design first, change second

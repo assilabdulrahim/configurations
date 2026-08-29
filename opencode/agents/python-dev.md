@@ -1,7 +1,7 @@
 ---
 description: Python implementation - code, scripts, packaging, virtualenvs, type hints. Use for Python tasks.
 mode: subagent
-model: ollama/qwen3-coder-next:latest
+model: kimi-for-coding/k3-256k
 temperature: 0.1
 permission:
   edit: allow

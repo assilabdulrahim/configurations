@@ -1,7 +1,7 @@
 ---
 description: C#/.NET implementation - ASP.NET, NuGet, MSBuild, EF. Use for .NET tasks.
 mode: subagent
-model: ollama/qwen3-coder-next:latest
+model: kimi-for-coding/k3-256k
 temperature: 0.1
 permission:
   edit: allow

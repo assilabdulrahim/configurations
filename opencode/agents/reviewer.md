@@ -1,5 +1,6 @@
 ---
 description: Read-only reviewer for security and correctness. Use before merging.
+model: deepseek/deepseek-v4-pro
 mode: subagent
 temperature: 0
 permission:

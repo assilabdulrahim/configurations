@@ -29,7 +29,7 @@ const TIERS = [
   ['coder', 'kimi-for-coding/k3-256k', 262144],
   ['free-validator', 'openrouter/z-ai/glm-5.2:free', 256000],
   ['free-coder', 'openrouter/minimax/minimax-m3:free', 1048576],
-  ['free-thinker', 'openrouter/nvidia/nemotron-3-ultra…:free', 1000000],
+  ['free-thinker', 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free', 1000000],
   ['free-analyst', 'openrouter/thinkingmachines/inkling:free', 1048576],
   ['orchestrator', 'deepseek/deepseek-v4-pro', 1000000],
 ];

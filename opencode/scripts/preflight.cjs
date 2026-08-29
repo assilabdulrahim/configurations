@@ -18,6 +18,14 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+// Global fetch is Node 18+. Without this the failure is a bare ReferenceError
+// from inside head(), which reads like a bug in this script rather than an
+// old runtime.
+if (typeof fetch !== 'function') {
+  console.error('preflight needs Node 18+ for global fetch (running ' + process.version + ').');
+  process.exit(2);
+}
+
 const JSON_OUT = process.argv.includes('--json');
 const OLLAMA = 'http://192.168.86.24:11434';
 const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json');

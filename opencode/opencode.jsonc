@@ -5,9 +5,11 @@
   // Three cost classes, cheapest first:
   //
   //   LOCAL         Ollama box on the LAN. Free, unlimited, PRIVATE.
-  //                 Weak: 32k-131k context.
-  //   FREE          OpenCode Zen free models (big-pickle, minimax, nemotron,
-  //                 glm, kimi-k2.5-free, deepseek-v4-flash-free, +24 more).
+  //                 Weak on capability: 32k-256k context.
+  //   FREE          OpenRouter free tier (minimax, nemotron, glm, inkling),
+  //                 plus OpenCode Zen free models (big-pickle, kimi-k2.5-free,
+  //                 deepseek-v4-flash-free, +24 more) once `opencode auth
+  //                 login` has been run for the opencode provider.
   //                 Free, 200k-1M context, tool-capable, genuinely strong.
   //   SUBSCRIPTION  Kimi and Anthropic. Flat cost but FINITE QUOTA.
   //
@@ -54,7 +56,7 @@
       "models": {
         "llama3.1:70b": { "name": "Llama 3.1 70B (Local, 131k, tools)" },
         "qwen3:32b": { "name": "Qwen3 32B (Local, 40k, tools+thinking)" },
-        "gemma4:26b": { "name": "Gemma 4 26B (Local, tools+thinking)" },
+        "gemma4:26b": { "name": "Gemma 4 26B (Local, 256k, tools+thinking)" },
         "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Local, 32k, tools)" }
         // Deliberately absent:
         //   deepseek-coder-v2  - capabilities ["completion","insert"], no

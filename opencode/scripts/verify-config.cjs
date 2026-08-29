@@ -61,9 +61,15 @@ for (const a of [...agents].sort()) {
 // --- 2. router allow-list matches the agents on disk
 console.log('\n-- router wiring --');
 const orch = fs.readFileSync('agents/orchestrator.md', 'utf8');
-const named = [...orch.split('  task:')[1].split('---')[0].matchAll(/^\s+"([a-z-]+)":\s*allow/gm)].map(m => m[1]);
+// A verifier must not die on the thing it is verifying: if the frontmatter
+// moves or the section disappears, report a FAIL and carry on with the rest.
+const taskBlock = orch.includes('  task:')
+  ? orch.split('  task:')[1].split('---')[0] : null;
+if (taskBlock === null) bad('agents/orchestrator.md: no "  task:" permission block to read the allow-list from');
+const named = taskBlock === null ? []
+  : [...taskBlock.matchAll(/^\s+"([a-z-]+)":\s*allow/gm)].map(m => m[1]);
 for (const a of named) if (!agents.has(a)) bad('router may call missing agent: ' + a);
-console.log('OK   router allow-list: ' + named.length + ' agents, all exist');
+if (taskBlock !== null) console.log('OK   router allow-list: ' + named.length + ' agents, all exist');
 for (const a of agents) if (a !== 'orchestrator' && !named.includes(a)) console.log('WARN unreachable from router: ' + a);
 
 // --- 3. skills are well formed, and every skill the router names exists
@@ -142,7 +148,7 @@ console.log('\n-- ctx-estimate tier table --');
   for (const [, agent, model, ctx] of table.matchAll(/\['([a-z-]+)', '([^']+)', (\d+)\]/g)) {
     if (!agents.has(agent)) { bad('ctx-estimate lists unknown agent: ' + agent); continue; }
     const actual = pin(agent);
-    if (model.includes('…')) { console.log('OK   ' + agent.padEnd(16) + ctx.padStart(9) + '  (label elided)'); continue; }
+    if (model.includes('…')) { bad('ctx-estimate elides the model id for ' + agent + ' - store the exact id so this check can compare it'); continue; }
     if (actual !== model) bad('ctx-estimate says ' + agent + ' = ' + model + ', agents/ says ' + actual);
     else console.log('OK   ' + agent.padEnd(16) + ctx.padStart(9) + '  ' + model);
   }

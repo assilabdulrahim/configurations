@@ -39,7 +39,7 @@ const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json')
 const DEEPSEEK_LOW_USD = Number(process.env.DEEPSEEK_LOW_USD || 10);
 const DEEPSEEK_CRITICAL_USD = Number(process.env.DEEPSEEK_CRITICAL_USD || 2);
 
-const out = { authed: {}, ollama: null, balances: {}, reachable: {}, agents: {}, reload: null };
+const out = { authed: {}, ollama: null, balances: {}, credentials: {}, reachable: {}, agents: {}, reload: null };
 const log = (...a) => { if (!JSON_OUT) console.log(...a); };
 
 function reloadNotice(bal, cur, state) {
@@ -142,6 +142,56 @@ async function head(url, headers, timeoutMs = 8000) {
   log('  -    openrouter      free tier: no balance API. 429 at call time is the only signal.');
   log('  -    google          no balance API exposed here.');
 
+  // ---- 3b. does each credential actually WORK? ------------------------
+  // A key sitting in auth.json proves nothing: a revoked OpenRouter key is
+  // still well-formed, and the failure only shows up mid-task as
+  // `User not found`. Every provider that offers a cheap read-only endpoint
+  // gets probed here so a dead credential is a preflight failure, not a
+  // surprise three tool calls into a session.
+  //
+  // Note the OpenRouter attribution headers: some free models (inkling) return
+  // 403 "only available on agentic harnesses" without them, so a probe that
+  // omitted them would report a false DEAD.
+  const OR_HEADERS = k => ({
+    Authorization: 'Bearer ' + k,
+    'HTTP-Referer': 'https://opencode.ai',
+    'X-Title': 'opencode',
+  });
+  const PROBES = {
+    openrouter: k => ['https://openrouter.ai/api/v1/key', OR_HEADERS(k)],
+    deepseek: k => ['https://api.deepseek.com/models', { Authorization: 'Bearer ' + k }],
+    'kimi-for-coding': k => ['https://api.kimi.com/coding/v1/models', { Authorization: 'Bearer ' + k }],
+    moonshotai: k => ['https://api.moonshot.ai/v1/models', { Authorization: 'Bearer ' + k }],
+    google: k => ['https://generativelanguage.googleapis.com/v1beta/models?key=' +
+      encodeURIComponent(k), {}],
+  };
+
+  log('\n-- credential liveness --');
+  for (const prov of Object.keys(out.authed)) {
+    const k = key(prov);
+    const mk = PROBES[prov];
+    if (!mk || !k) {
+      out.credentials[prov] = { state: 'UNVERIFIED', detail: 'no cheap probe endpoint' };
+      log('  ?    ' + prov.padEnd(20) + 'UNVERIFIED - no probe endpoint; 401 at call time is the only signal');
+      continue;
+    }
+    const [url, headers] = mk(k);
+    const r = await head(url, headers);
+    // 400 is here because Google answers an invalid key with 400, not 401.
+    const state = r.status >= 200 && r.status < 300 ? 'LIVE'
+      : [400, 401, 403].includes(r.status) ? 'REJECTED'
+        : r.status === 429 ? 'RATE_LIMITED' : 'UNREACHABLE';
+    let detail = '';
+    try { const j = JSON.parse(r.body); detail = (j.error && (j.error.message || j.error.status)) || ''; }
+    catch { detail = r.status ? '' : String(r.body).slice(0, 60); }
+    out.credentials[prov] = { state, status: r.status, detail };
+    const tag = { LIVE: 'OK  ', REJECTED: 'DEAD', RATE_LIMITED: 'WARN', UNREACHABLE: 'WARN' }[state];
+    log('  ' + tag + ' ' + prov.padEnd(20) + state + (r.status ? ' (' + r.status + ')' : '') +
+      (detail ? ' - ' + detail.slice(0, 70) : ''));
+    if (state === 'REJECTED')
+      log('       every agent on this provider is unusable - re-auth: opencode auth login -> ' + prov);
+  }
+
   // ---- 4. can each agent's provider actually be used? -----------------
   log('\n-- agent reachability --');
   const agentsDir = path.join(__dirname, '..', 'agents');
@@ -157,14 +207,18 @@ async function head(url, headers, timeoutMs = 8000) {
       ok = !!(out.ollama && out.ollama.includes(id));
       why = out.ollama ? (ok ? 'pulled' : 'NOT PULLED') : 'ollama unreachable';
     } else {
-      ok = !!out.authed[prov];
-      why = ok ? 'provider authed' : 'PROVIDER NOT AUTHED - run: opencode auth login -> ' + prov;
+      const cred = out.credentials[prov];
+      if (!out.authed[prov]) { ok = false; why = 'PROVIDER NOT AUTHED - run: opencode auth login -> ' + prov; }
+      else if (cred && cred.state === 'REJECTED') { ok = false; why = 'CREDENTIAL REJECTED (' + cred.status + ') - re-auth: opencode auth login -> ' + prov; }
+      else if (cred && cred.state === 'LIVE') { ok = true; why = 'credential verified live'; }
+      else { ok = true; why = 'key present, NOT verified'; }
     }
     out.agents[name] = { model: m, usable: ok, reason: why };
     rows.push([ok, name, m, why]);
   }
   for (const [ok, name, m, why] of rows)
-    log('  ' + (ok ? 'OK  ' : 'DEAD') + ' ' + name.padEnd(19) + m.padEnd(48) + (ok ? '' : why));
+    log('  ' + (ok ? (why === 'key present, NOT verified' ? 'OK? ' : 'OK  ') : 'DEAD') +
+      ' ' + name.padEnd(19) + m.padEnd(48) + (ok && why.startsWith('credential') ? '' : why));
 
   const dead = rows.filter(r => !r[0]);
   log('\n' + (rows.length - dead.length) + '/' + rows.length + ' agents usable' +

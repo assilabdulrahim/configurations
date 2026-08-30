@@ -27,7 +27,7 @@
   // tool-capable, costs nothing, and openrouter is ALREADY authenticated.
   // (opencode/big-pickle is the nicer default but needs `opencode auth login`
   // for the opencode provider first - see scripts/preflight.cjs.)
-  "model": "openrouter/minimax/minimax-m3:free",
+  "model": "opencode/big-pickle",
 
   // Title generation / bookkeeping only. Kept local so it never touches quota.
   "small_model": "ollama/qwen2.5-coder:7b",

@@ -1,13 +1,13 @@
 ---
-description: Default implementer. Free 1M-context model on OpenRouter (minimax-m3). Try this before spending any subscription quota.
+description: Default implementer. Free 200K-context model on OpenCode Zen (Big Pickle). Try this before spending any subscription quota.
 mode: subagent
-model: openrouter/minimax/minimax-m3:free
+model: opencode/big-pickle
 temperature: 0.1
 permission:
   edit: allow
   bash: ask
 ---
-You are a senior developer running on a free, tool-capable model with a 1M
+You are a senior developer running on a free, tool-capable model with a 200K
 context. You are the default implementer: the point of you is that good work
 here costs nothing.
 

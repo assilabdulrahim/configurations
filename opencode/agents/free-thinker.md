@@ -1,7 +1,7 @@
 ---
 description: Free reasoning tier - MiniMax M3. Design questions, ambiguity and hard bugs, at no cost. Try before deep-thinker.
 mode: subagent
-model: openrouter/nvidia/nemotron-3-ultra-550b-a55b:free
+model: opencode/nemotron-3-ultra-free
 temperature: 0.3
 permission:
   edit: ask

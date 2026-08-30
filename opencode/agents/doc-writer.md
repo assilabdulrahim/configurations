@@ -1,7 +1,7 @@
 ---
 description: Writes technical documents - design docs, ADRs, RFCs, runbooks, READMEs, specs, incident reports. Free model. Invokes the `document` skill.
 mode: subagent
-model: openrouter/minimax/minimax-m3:free
+model: opencode/ling-3.0-flash-fin-free
 temperature: 0.3
 permission:
   edit: allow

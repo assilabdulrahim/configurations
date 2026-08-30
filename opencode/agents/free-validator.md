@@ -1,7 +1,7 @@
 ---
 description: Free cross-model validation - GLM-5. Independently checks work by a different model, at no cost. Read-only.
 mode: subagent
-model: openrouter/z-ai/glm-5.2:free
+model: ollama/llama3.1:70b
 temperature: 0
 permission:
   edit: deny

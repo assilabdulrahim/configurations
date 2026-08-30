@@ -1,7 +1,7 @@
 ---
-description: Free whole-repo analysis - 1M context, read-only. "How does X work", cross-file tracing, audits, at no cost.
+description: Free whole-repo analysis - 1M context, read-only, on OpenCode Zen (Muse Spark). At no cost..
 mode: subagent
-model: openrouter/thinkingmachines/inkling:free
+model: opencode/muse-spark-1.2-contributor-free
 temperature: 0.1
 permission:
   edit: deny

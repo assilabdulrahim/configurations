@@ -27,10 +27,10 @@ const TIERS = [
   ['local-validator', 'ollama/llama3.1:70b', 131072],
   ['local-reasoner', 'ollama/gemma4:26b', 262144],
   ['coder', 'kimi-for-coding/k3-256k', 262144],
-  ['free-validator', 'openrouter/z-ai/glm-5.2:free', 256000],
-  ['free-coder', 'openrouter/minimax/minimax-m3:free', 1048576],
-  ['free-thinker', 'openrouter/nvidia/nemotron-3-ultra-550b-a55b:free', 1000000],
-  ['free-analyst', 'openrouter/thinkingmachines/inkling:free', 1048576],
+  ['free-validator', 'ollama/llama3.1:70b', 131072],
+  ['free-coder', 'opencode/big-pickle', 204800],
+  ['free-thinker', 'opencode/nemotron-3-ultra-free', 1048576],
+  ['free-analyst', 'opencode/muse-spark-1.2-contributor-free', 1048576],
   ['orchestrator', 'deepseek/deepseek-v4-pro', 1000000],
 ];
 

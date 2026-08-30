@@ -1,8 +1,9 @@
 # Router support scripts
 
-Three scripts. The first two are what the router calls at runtime so its
+Four scripts. The first two are what the router calls at runtime so its
 decisions are **measured rather than guessed**; the third is a static check
-you run after editing config.
+you run after editing config; the fourth calls every model for real and
+checks the router's design against what actually answers.
 
 ---
 
@@ -120,3 +121,46 @@ Catches:
 
 It also labels each model FREE / SUBSCRIPTION / metered, because models.dev
 reports zero cost for subscription plans and that is easy to misread.
+
+---
+
+## `smoke-agents.cjs` — does the design hold at call time?
+
+```bash
+node scripts/smoke-agents.cjs           # free + local tiers, costs nothing
+node scripts/smoke-agents.cjs --paid    # + kimi / deepseek / google / zen
+node scripts/smoke-agents.cjs --agent free-coder
+node scripts/smoke-agents.cjs --json
+```
+
+`verify-config.cjs` checks the config against catalogs. `preflight.cjs` checks
+that credentials resolve. **Neither calls a model.** This one does, because
+every gap found so far lived in that space: a revoked key that still parses, a
+model the catalog says has vision that returns 404 for images, an agent labelled
+`tools` that never emits a tool call.
+
+Per agent it measures three things the router assumes:
+
+| Probe | Why it is not optional |
+|---|---|
+| `TEXT` | the model answers at all |
+| `TOOLS` | it emits a real `tool_call` — an agent that cannot, cannot edit a file, so a text-only PASS is not enough. `tool_choice` is escalated `auto` → `required` before believing a failure, since tool use is probabilistic |
+| `VISION` | it accepts an image, tested **both** inline base64 and remote URL, because only inline can carry a file off this machine |
+
+Then it checks four invariants from `agents/orchestrator.md`:
+
+1. every fallback chain has at least one live step
+2. a live implementer and a live validator exist in **different** families —
+   otherwise cross-model validation is impossible no matter what §8 says
+3. the `default_agent` (the router itself) is live
+4. something can read an inline image, or no chart or screenshot produced this
+   session can ever be verified
+
+### Honest limits
+
+A `PASS` means the model answered one trivial prompt *now*. It is not a
+capability benchmark, and free-tier daily caps mean a PASS at noon can be a 429
+at midnight. Local models are called cold, so the first call to a 70B includes
+load time — expect ~75 s, not a hang. Vision uses a solid 64x64 PNG on purpose:
+a 1x1 pixel is rejected as `failed to decode` by several backends, which reads
+exactly like "this model is blind" and is not.

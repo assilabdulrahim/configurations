@@ -57,7 +57,11 @@
         "llama3.1:70b": { "name": "Llama 3.1 70B (Local, 131k, tools)" },
         "qwen3:32b": { "name": "Qwen3 32B (Local, 40k, tools+thinking)" },
         "gemma4:26b": { "name": "Gemma 4 26B (Local, 256k, tools+thinking)" },
-        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Local, 32k, tools)" }
+        "qwen2.5-coder:7b": { "name": "Qwen2.5 Coder 7B (Local, 32k, NO parsed tool calls)" }
+        // Measured by scripts/smoke-agents.cjs: this model answers, but
+        // its tool call comes back as JSON *inside content* - ollama does
+        // not parse it into `tool_calls`, so no harness can execute it.
+        // Fine as small_model (titles); do not route edits here.
         // Deliberately absent:
         //   deepseek-coder-v2  - capabilities ["completion","insert"], no
         //                        tool calling, so it cannot drive an agent.

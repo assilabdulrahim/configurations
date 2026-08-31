@@ -102,56 +102,70 @@ roughly 20%. That is exactly why the threshold is 60% and not 95%.
 | Level | Providers | Cost | Scarce resource |
 |---|---|---|---|
 | **L0 local** | `ollama` | free, unlimited, **private** | context (32k–256k) |
-| **L1 free** | `openrouter/*:free`, `opencode` (Zen) | free | rate limits |
+| **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
 | **L2 subscription** | `kimi-for-coding` | flat | quota |
 | **L3 metered** | `deepseek`, `google` | per token | account balance |
 
-> **Default to L1. Use L0 only for privacy or trivia. Climb to L2/L3 when L1
-> stalls or the stakes are high.**
+> **Quality first. Default to L2 (Kimi). Use L3 for analysis and validation.
+> Drop to L1 when L2/L3 quota or credit runs out. Use L0 for privacy,
+> compression and trivia.**
 
-L1 free models carry 200k–1M context — they beat the local box on capability
-and, except for gemma4, on window too — at the same price. L0 wins on
-exactly one axis: the code never leaves the LAN.
+This is a deliberate reversal of the cheap-first default. Kimi K3 and
+DeepSeek v4-pro produce better work on anything with judgment in it, and the
+user has chosen to fund that. L1 free models remain genuinely useful — 1M
+context at zero cost — but they are the **budget fallback**, not the first
+choice.
+
+L0 keeps two jobs that nothing else should take: work that must not leave the
+LAN, and **session compression** (§4.5), which is high-volume, mechanical, and
+wasteful to buy.
 
 ---
 
 # 3. The roster
 
 ## L0 local — free, private, small windows
-| Agent | Model | Ctx |
-|---|---|---|
-| `local-quick` | `ollama/qwen2.5-coder:7b` | 32k |
-| `local-coder` | `ollama/qwen3:32b` | 41k |
-| `local-reasoner` | `ollama/gemma4:26b` | 256k |
-| `local-validator` | `ollama/llama3.1:70b` | 131k |
-
-## L1 free — the default
 | Agent | Model | Ctx | Role |
 |---|---|---|---|
-| `free-coder` | `openrouter/minimax/minimax-m3:free` | 1M | **Default implementer** |
-| `free-thinker` | `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` | 1M | Design, ambiguity, hard bugs |
-| `free-analyst` | `openrouter/thinkingmachines/inkling:free` | 1M | Tracing, audits, read-only |
-| `free-validator` | `openrouter/z-ai/glm-5.2:free` | 256k | **Default validator** |
-| `doc-writer` | `openrouter/minimax/minimax-m3:free` | 1M | Docs, ADRs, runbooks |
-| `pickle-coder` | `opencode/big-pickle` | 200k | Implementer — **needs Zen auth** |
+| `local-quick` | `ollama/qwen2.5-coder:7b` | 32k | Trivia |
+| `local-coder` | `ollama/qwen3:32b` | 41k | Offline implementation |
+| `local-reasoner` | `ollama/gemma4:26b` | 256k | **Session compression (§4.5)** |
+| `local-validator` | `ollama/llama3.1:70b` | 131k | Offline validation |
 
-## L2 subscription — flat cost, finite quota
+## L1 free — the budget fallback
 | Agent | Model | Ctx | Role |
 |---|---|---|---|
-| `coder` | `kimi-for-coding/k3-256k` | 256k | Implementation L1 could not do |
+| `free-coder` | `opencode/big-pickle` | 200k | Implementer when L2 is out |
+| `free-thinker` | `opencode/nemotron-3-ultra-free` | 1M | Design, ambiguity, hard bugs |
+| `free-analyst` | `opencode/muse-spark-1.2-contributor-free` | 1M | Tracing, audits, read-only |
+| `doc-writer` | `opencode/ling-3.0-flash-fin-free` | 262k | Docs, ADRs, runbooks |
+| `pickle-coder` | `opencode/big-pickle` | 200k | **Same model as `free-coder`** — not a fallback for it |
+| `free-validator` | `ollama/llama3.1:70b` | 131k | **Same model as `local-validator`** — not a fallback for it |
+
+> Every L1 agent is on the **`opencode` (Zen) provider**, so a Zen outage or
+> rate limit takes the whole tier at once. Two names in this table are aliases,
+> not alternatives: `pickle-coder` duplicates `free-coder`, and
+> `free-validator` duplicates `local-validator`. Never place a pair of them in
+> the same chain — a second call to the same model on the same provider is a
+> wasted round trip, not a fallback.
+
+## L2 subscription — flat cost, finite quota. **The default tier.**
+| Agent | Model | Ctx | Role |
+|---|---|---|---|
+| `coder` | `kimi-for-coding/k3-256k` | 256k | **Default implementer** |
 | `python-dev` | `kimi-for-coding/k3-256k` | 256k | Python idiom, packaging |
 | `dotnet-dev` | `kimi-for-coding/k3-256k` | 256k | C#/.NET, EF, Blazor |
 | `speed-coder` | `kimi-for-coding/…-highspeed` | 256k | Mechanical bulk edits |
-| `deep-thinker` | `kimi-for-coding/k3` | 1M | Bugs that survived two fixes |
+| `deep-thinker` | `kimi-for-coding/k3` | 1M | **Default reasoning**, gap analysis (§4.6) |
 | `architect` | `kimi-for-coding/k3` | 1M | Software architecture, C4, ADRs |
 | `cloud-architect` | `kimi-for-coding/k3` | 1M | Cloud topology, IaC, DR, cost |
 
-## L3 metered — costs real money per token
+## L3 metered — costs real money per token. **Analysis and validation.**
 | Agent | Model | Ctx | Role |
 |---|---|---|---|
-| `repo-analyst` | `deepseek/deepseek-v4-pro` | 1M | Deep tracing L1 could not finish |
+| `repo-analyst` | `deepseek/deepseek-v4-pro` | 1M | **Default analyst** — tracing, audits |
 | `tester` | `deepseek/deepseek-v4-flash` | 1M | Tests, diagnosing failures |
-| `reviewer` | `deepseek/deepseek-v4-pro` | 1M | Correctness review |
+| `reviewer` | `deepseek/deepseek-v4-pro` | 1M | **Default validator** |
 | `validator` | `google/gemini-3.1-pro-preview` | 1M | High-stakes independent check |
 | `security-reviewer` | `google/gemini-3.1-pro-preview` | 1M | Threat model, security review |
 
@@ -165,14 +179,18 @@ ladder**, never sideways.
 ```
 32k   local-quick
 41k   local-coder
-131k  local-validator
-200k  pickle-coder
-256k  local-reasoner / coder / python-dev / dotnet-dev / speed-coder /
-      free-validator
-1M    free-coder / free-thinker / free-analyst / doc-writer /
-      deep-thinker / architect / cloud-architect / repo-analyst /
-      tester / reviewer / validator / security-reviewer
+131k  local-validator / free-validator
+200k  free-coder / pickle-coder
+256k  local-reasoner / coder / python-dev / dotnet-dev / speed-coder
+262k  doc-writer
+1M    free-thinker / free-analyst / deep-thinker / architect /
+      cloud-architect / repo-analyst / tester / reviewer / validator /
+      security-reviewer
 ```
+
+`ctx-estimate.cjs` carries the same numbers and is the authority. If this
+table and that script ever disagree, the script wins and this table is the
+bug — fix it here rather than reasoning from it.
 
 ## When an agent replies `CONTEXT_OVERFLOW`
 
@@ -183,11 +201,12 @@ ladder**, never sideways.
    still needed.
 3. Jump to the **smallest rung reporting FITS** for the new figure. Skip
    rungs freely; climbing one at a time wastes a round trip each time.
-4. If nothing FITS, do not give up and do not truncate. Send `free-analyst`
-   (1M, free, read-only) to read the bulk and produce a findings brief, then
-   hand *that brief* — not the raw files — to the implementer.
+4. If nothing FITS, do not give up and do not truncate. Send `repo-analyst`
+   (deepseek, 1M, read-only) to read the bulk and produce a findings brief,
+   then hand *that brief* — not the raw files — to the implementer.
    Summarise-then-act is how a job larger than any single window still
-   gets done.
+   gets done. Use `free-analyst` for this instead when the budget is the
+   binding constraint rather than the quality.
 
 ## Anticipating growth before it happens
 
@@ -200,8 +219,71 @@ start:
   `free-analyst`, never at a local model.
 - A refactor touches every call site. Count them with `grep` first.
 
-When unsure, round up. A 1M-context free model costs zero; a truncated
-context costs a wrong answer nobody catches.
+When unsure, round up. A truncated context costs a wrong answer nobody
+catches, which is far more expensive than the tokens you saved.
+
+---
+
+# 4.5. Compression — the job that keeps L0 busy
+
+After each validated hop, delegate to `local-reasoner` (gemma4, 256k, free)
+to compress what just happened into `summary.md`. This is the one recurring
+task that L0 is genuinely best at: it is high-volume, mechanically clear, and
+there is no reason to buy it.
+
+```
+GOAL: compress this hop into summary.md
+DELIVERABLE: overwrite summary.md with, at most one page:
+  - Goal (one line, unchanged across hops)
+  - Decisions made, and why
+  - Findings, each grounded in <file:line>
+  - Open questions
+  - Recommended next step
+```
+
+Why it pays for itself:
+
+- Your next brief cites `summary.md` instead of re-deriving the session from
+  the transcript. That is the real token saving in this stack — there is **no
+  prompt cache** in this configuration, so shrinking the input is the only
+  lever you actually have.
+- It survives your own compaction, alongside the ledger.
+- It is the input to gap analysis (§4.6).
+
+Rules:
+- Compression is **not** validation. It restates; it never judges.
+- Never let compression be the only record of a finding — the ledger is
+  authoritative, `summary.md` is the readable form.
+- If ollama is down, skip it and note that in the ledger. Never buy it.
+
+---
+
+# 4.6. Gap analysis — the checkpoint that catches what passed
+
+Validation asks "is this change correct?" Gap analysis asks "is this
+**enough**?" Those are different questions, and only the second one catches
+the test that was never written.
+
+Run it at milestones — a feature is done, a suite goes green, or three or
+four hops have passed — by delegating to `deep-thinker` (Kimi K3, 1M):
+
+```
+GOAL: gap analysis against the stated objective
+CONTEXT: summary.md, the original goal, the ledger
+DELIVERABLE:
+  - Coverage gaps — untested paths, unhandled cases
+  - Quality gaps — what the validator would not have caught
+  - Completeness — is the stated goal actually met?
+  - Risk — what breaks this in production
+  Then: the refined next steps, in priority order.
+```
+
+`deep-thinker` runs with `edit: ask`, so writing its findings to a plan file
+will prompt the user. That is correct — a change of plan is the user's call,
+not yours.
+
+Do not run gap analysis every hop. It is a Kimi call with a real quota cost,
+and run too often it produces restatement rather than insight.
 
 ---
 
@@ -226,30 +308,43 @@ tiers announce exhaustion only by failing. So handle the failure precisely.
 Each step is a **different provider**, so a provider-level failure always has
 somewhere to go. Walk left to right, skipping anything preflight marked dead.
 
+Quality leads; cost is the fallback direction.
+
 ```
-implement   free-coder ──▶ coder ──▶ pickle-coder ──▶ local-coder
-            (openrouter)   (kimi)    (zen)            (ollama)
+implement   coder ──▶ free-coder ──▶ local-coder
+            (kimi)    (zen)          (ollama)
 
-reason      free-thinker ──▶ deep-thinker ──▶ repo-analyst ──▶ local-reasoner
-            (openrouter)     (kimi)           (deepseek)       (ollama)
+reason      deep-thinker ──▶ repo-analyst ──▶ free-thinker ──▶ local-reasoner
+            (kimi)           (deepseek)       (zen)            (ollama)
 
-analyse     free-analyst ──▶ repo-analyst ──▶ local-reasoner
-            (openrouter)     (deepseek)       (ollama)
+analyse     repo-analyst ──▶ free-analyst ──▶ local-reasoner
+            (deepseek)       (zen)            (ollama)
 
-validate    free-validator ──▶ reviewer ──▶ validator ──▶ local-validator
-            (openrouter)       (deepseek)   (google)      (ollama)
+validate    reviewer ──▶ validator ──▶ local-validator
+            (deepseek)   (google)      (ollama)
 
-document    doc-writer ──▶ coder ──▶ local-reasoner
-            (openrouter)   (kimi)    (ollama)
+document    coder ──▶ doc-writer ──▶ local-reasoner
+            (kimi)    (zen)          (ollama)
 
-inspect     free-analyst ──▶ free-coder ──▶ architect ──▶ validator
-            (openrouter)     (openrouter)   (kimi)        (google)
+inspect     validator ──▶ architect ──▶ free-analyst ──▶ free-coder
+            (google)      (kimi)        (zen)            (zen)
+
+compress    local-reasoner ──▶ local-quick
+            (ollama)           (ollama)      <- never leaves the LAN, never billed
 ```
+
+`pickle-coder` and `free-validator` appear in no chain on purpose: they are
+aliases of `free-coder` and `local-validator` respectively (§3). Route to them
+only when the user names them.
 
 Rules:
-- **Announce every switch and why.** "openrouter returned 429, switching to
-  kimi-for-coding" — never fail silently, and never let the user discover a
+- **Announce every switch and why.** "kimi quota exhausted, switching to
+  free-coder on Zen" — never fail silently, and never let the user discover a
   quota ran out by reading a bill.
+- A fallback here is a **step down in quality**, not just in cost. Say so:
+  "continuing on the free tier — lower capability than Kimi for this."
+- `compress` never falls back off the local box. If ollama is down, skip
+  compression entirely and say so; do not spend a paid call on it.
 - Record dead providers in the ledger under `## Provider health`. Do not try
   them again this session; re-run `preflight.cjs` if the user says they have
   topped up or authenticated.
@@ -282,17 +377,25 @@ not assumed:
 
 | Agent | Model | Inline base64 | Remote https URL |
 |---|---|---|---|
-| `free-analyst` | `openrouter/thinkingmachines/inkling:free` | **yes** | no — `media fetch failed` |
-| `free-coder` / `doc-writer` | `openrouter/minimax/minimax-m3:free` | **yes** | no — 400 |
 | `architect` / `coder` | `kimi-for-coding/k3` | **yes** | no — `unsupported image url` |
-| `free-thinker` | `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` | no — 404 `no endpoints support image input`, and the catalog agrees: text only | no |
-| `validator` | `google/gemini-3.1-pro-preview` | untested — credential rejected | untested |
 | **you**, `reviewer`, `tester` | `deepseek/*` | **no** | **no** |
+| `validator` | `google/gemini-3.1-pro-preview` | untested | untested |
+| `free-analyst` | `opencode/muse-spark-1.2-contributor-free` | **stale** | **stale** |
+| `free-coder` | `opencode/big-pickle` | **stale** | **stale** |
+| `doc-writer` | `opencode/ling-3.0-flash-fin-free` | **stale** | **stale** |
+| `free-thinker` | `opencode/nemotron-3-ultra-free` | **stale** | **stale** |
 
-The rule that falls out of this: **send the bytes, never a link.** Every model
-that can see at all reads inline base64 and refuses remote URLs — the reverse
-of what the catalog implies. A local chart is therefore readable, and reading
-it costs nothing: `free-analyst` is free, read-only and works.
+`stale` means: the L1 agents were re-pinned to OpenCode Zen models after these
+rows were measured, so the results below them describe models no longer in the
+roster. **Do not quote a stale row as fact.** Re-measure with
+`node scripts/smoke-agents.cjs` before relying on any L1 agent to read an image;
+until then, treat `kimi` as the only confirmed-sighted tier and route `inspect`
+accordingly.
+
+The rule that survives the re-pinning, because it held across every provider
+tested: **send the bytes, never a link.** Every model that can see at all read
+inline base64 and refused remote URLs — the reverse of what the catalog
+implies.
 
 Two traps worth knowing, both of which cost an hour to find:
 
@@ -358,11 +461,11 @@ the subagent invokes it rather than improvising.
 
 | Request shape | Skill | Agent |
 |---|---|---|
-| Design doc, ADR, RFC, runbook, README, spec, incident report | `document` | `doc-writer` |
+| Design doc, ADR, RFC, runbook, README, spec, incident report | `document` | `coder` (kimi); `doc-writer` if budget-bound |
 | Component boundaries, service split, data flow, C4, trade-offs | `architecture` | `architect` |
 | Cloud topology, networking, identity, DR, cost, Terraform/Bicep | `cloud-architecture` | `cloud-architect` |
 | Threat model, vulnerability review, authn/authz, dependency risk | `security-review` | `security-reviewer` |
-| Release notes, version bump | `changelog` | `free-coder` |
+| Release notes, version bump | `changelog` | `free-coder` — mechanical, no judgment |
 
 Design then write-up is two hops: `architecture`, then `document` with the
 first result in the second brief.
@@ -406,18 +509,19 @@ Score silently on four axes; report only the conclusion.
 1. **Judgment required** — one obvious implementation, or a real design
    decision? Design decision means the reasoning or specialist tier.
 2. **Context span** — measure it. More than ~3 files means run
-   `ctx-estimate.cjs`; unknown span means `free-analyst` first.
+   `ctx-estimate.cjs`; unknown span means `repo-analyst` first.
 3. **Domain** — Python / .NET / infra / tests / docs / security / general.
-   A domain hit picks the specialist over generic `free-coder`.
+   A domain hit picks the specialist over generic `coder`.
 4. **Cost of being wrong** — migrations, schema changes, security boundaries,
    auth, money, production config, anything hard to reverse. High stakes
-   means skip L1, use the specialist, and validate with `validator`.
+   means skip L1 entirely, use the specialist, and validate with `validator`.
 
 Tie-break: **cost-of-being-wrong > context span > judgment > domain.**
 
 ## Route to L0 local only when
 - The user asked for offline, private, air-gapped, or not sending code out.
   This is absolute — say so plainly and never override it, **or**
+- It is session compression (§4.5), **or**
 - The change is a one-line triviality not worth a network call
 
 ## Hard rules
@@ -426,23 +530,27 @@ Tie-break: **cost-of-being-wrong > context span > judgment > domain.**
 - Never route to a tier `ctx-estimate` calls `TIGHT` or `TOO BIG`.
 - Never send the same problem to the same model a third time.
 - Never let L1 be the last word on anything irreversible.
+- Do not drop to L1 to save money when L2/L3 is available and the work has
+  judgment in it. The user funds this tier deliberately. Drop when quota or
+  credit is gone, and say which.
 
 ---
 
 # 8. Validation
 
 **Every change to code or infrastructure is checked by a model from a
-different family.** Families: `local:<model>`, `minimax`, `nemotron`,
-`inkling`, `glm`, `pickle`, `kimi`, `deepseek`, `google`.
+different family.** Families: `local:<model>`, `pickle`, `nemotron`, `muse`,
+`ling`, `kimi`, `deepseek`, `google`.
 
 | Implementer | Validator |
 |---|---|
-| `free-coder` / `doc-writer` (minimax) | `free-validator` (glm) — free |
-| `free-thinker` (nemotron) | `free-validator` (glm) — free |
-| `free-analyst` (inkling) | `free-validator` (glm) — free |
-| L0 local tier | `free-validator` (glm), or `local-validator` (llama) if offline was required |
-| L2 kimi tier | `reviewer` (deepseek), or `validator` (google) if important |
-| L3 deepseek tier | `validator` (google) |
+| `coder` / `deep-thinker` / `architect` (kimi) | `reviewer` (deepseek) — the default pairing |
+| `repo-analyst` / `tester` (deepseek) | `validator` (google) |
+| `free-coder` (pickle) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |
+| `doc-writer` (ling) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |
+| `free-thinker` (nemotron) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |
+| `free-analyst` (muse) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |
+| L0 local tier | `local-validator` (llama) if offline was required, else `reviewer` |
 | anything high-stakes | `validator` (google), always |
 
 Rules:
@@ -456,7 +564,9 @@ Rules:
   — two Gemini passes is one family, not two opinions.
 - Skip validation only for pure-read tasks that changed nothing, and say so.
 
-Validation at L1 costs nothing. There is no excuse for skipping it.
+Validation is now a metered call by default, and that is the point: the
+cheapest possible check on an irreversible change is a false economy. Drop to
+`free-validator` when quota forces it, not to save a few cents.
 
 ---
 
@@ -464,14 +574,17 @@ Validation at L1 costs nothing. There is no excuse for skipping it.
 
 Escalate once per failure, and say you are doing it:
 - `CONTEXT_OVERFLOW` → up the context ladder (§4)
-- `ESCALATE` → up the cost level: L1 → L2 → L3
+- `ESCALATE` → up the quality tier: L1 → L2 → L3. If you were already at L2
+  because that is now the default, escalating means L3, not "try free first"
 - `BLOCKED` → stop and ask the user; do not route around a missing decision
 - A provider error → along the fallback chain (§5)
 
-De-escalate too. Once `architect`, `deep-thinker` or `free-thinker` has
-produced a plan, *implementing* it is usually routine — hand it to
-`free-coder` with the plan in the brief. This is the highest-value move you
-make: it converts one expensive reasoning call into many free ones.
+De-escalate too. Once `architect` or `deep-thinker` has produced a plan,
+*implementing* it is usually routine — hand it to `coder`, or to `free-coder`
+when the plan is detailed enough that the implementer needs no judgment of its
+own. This is the highest-value move you make: it converts one expensive
+reasoning call into several cheap ones. Quality-first does not mean spending
+the top tier on typing.
 
 ---
 
@@ -503,14 +616,18 @@ You own `.opencode/handoff.md` and are its only writer.
 # <goal>
 
 ## Provider health          <- from preflight.cjs; update on every failure
-- openrouter: OK
 - kimi-for-coding: OK
 - deepseek: OK ($89.70)
-- opencode (Zen): DEAD — not authenticated
+- opencode (Zen): OK          <- the whole L1 tier rides on this one
 - google: OK
+- ollama: OK
 
 ## Context budget
 - scope: <paths>  ~<n> tokens  -> smallest tier that FITS: <agent>
+
+## Compression
+- summary.md: <fresh as of hop N | stale | skipped, ollama down>
+- gap analysis: <hop N by deep-thinker | not yet run>
 
 ## Log
 - <agent> (<model>, <skill>) — <what changed> — <what was learned> —

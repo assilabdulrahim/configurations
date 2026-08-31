@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(node scripts/preflight.cjs:*)",
+      "Bash(node scripts/ctx-estimate.cjs:*)",
+      "Bash(node scripts/verify-config.cjs:*)",
+      "Bash(node scripts/smoke-agents.cjs:*)",
+      "Read"
+    ]
+  }
+}

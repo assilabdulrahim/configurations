@@ -1,5 +1,5 @@
 ---
-description: Free reasoning tier - MiniMax M3. Design questions, ambiguity and hard bugs, at no cost. Try before deep-thinker.
+description: Free reasoning tier - Nemotron 3 Ultra on OpenCode Zen, 1M context. Design questions, ambiguity and hard bugs, at no cost. Budget fallback for deep-thinker.
 mode: subagent
 model: opencode/nemotron-3-ultra-free
 temperature: 0.3

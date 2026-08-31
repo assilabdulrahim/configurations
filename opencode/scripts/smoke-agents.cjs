@@ -68,6 +68,9 @@ const ENDPOINT = {
   google: k => ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
     { Authorization: 'Bearer ' + k }, 'paid'],
   opencode: k => ['https://opencode.ai/zen/v1/chat/completions', { Authorization: 'Bearer ' + k }, 'paid'],
+  // models.dev lists minimax's base as .../anthropic/v1, but it also serves an
+  // OpenAI-shaped /v1/chat/completions - verified 200 with a choices[] body.
+  minimax: k => ['https://api.minimax.io/v1/chat/completions', { Authorization: 'Bearer ' + k }, 'paid'],
 };
 
 // Two ways to hand a model an image, and they are NOT interchangeable:

@@ -229,8 +229,20 @@ function chains() {
         ? 'answered in prose, emitted no tool_call (even with tool_choice=required)'
         : errOf(tool);
 
-      const claimsVision = catalog && catalog[prov] && catalog[prov].models[id] &&
-        (catalog[prov].models[id].modalities || {}).input || [];
+      // models.dev describes hosted models; it does not know what has been
+      // pulled onto a local ollama box, so asking it about ollama/* silently
+      // skipped the vision probe for every local model. gemma4:26b reports
+      // "vision" to ollama and reads an inline image correctly - the catalog
+      // was never going to tell us that. Ask the box about the box.
+      let claimsVision;
+      if (prov === 'ollama') {
+        const show = await post(OLLAMA + '/api/show', {}, { name: id }, 20000);
+        claimsVision = (show.json && show.json.capabilities || []).includes('image') ||
+          (show.json && show.json.capabilities || []).includes('vision') ? ['image'] : [];
+      } else {
+        claimsVision = catalog && catalog[prov] && catalog[prov].models[id] &&
+          (catalog[prov].models[id].modalities || {}).input || [];
+      }
       if (Array.isArray(claimsVision) && claimsVision.includes('image')) {
         const seeImage = async src => {
           // 200 proves the image was accepted; naming the colour proves it was

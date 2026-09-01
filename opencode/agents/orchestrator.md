@@ -455,8 +455,8 @@ validate    reviewer ──▶ validator ──▶ local-validator
 document    coder ──▶ doc-writer ──▶ glm-coder ──▶ local-reasoner
             (kimi)    (zen)          (openrouter)  (ollama)
 
-inspect     architect ──▶ validator ──▶ glm-coder ──▶ free-analyst
-            (kimi)        (google)      (openrouter)  (zen, unverified)
+inspect     architect ──▶ validator ──▶ glm-coder ──▶ local-reasoner
+            (kimi)        (google)      (openrouter)  (ollama, private)
 
 compress    local-reasoner                   <- one step, on purpose
             (ollama)                            never leaves the LAN, never billed
@@ -529,6 +529,7 @@ not assumed:
 
 | Agent | Model | Inline base64 | How this row was established |
 |---|---|---|---|
+| `local-reasoner` | `ollama/gemma4:26b` | **yes** | measured live — **and it never leaves the LAN** |
 | `glm-coder` | `openrouter/z-ai/glm-5.3-flash` | **yes** | measured live |
 | `architect` / `deep-thinker` / `cloud-architect` / `wide-coder` | `kimi-for-coding/k3` | **yes** | measured live |
 | `coder` / `python-dev` / `dotnet-dev` | `kimi-for-coding/k3-256k` | **yes** | measured live |
@@ -551,6 +552,14 @@ Read the third column before you trust the second. **`no`** is settled — the
 catalog says text-only and there is nothing to re-probe. **`unverified`** means
 the model claims image input and the provider was down when it was tried; treat
 it as unusable for `inspect` until it answers, not as blind.
+
+**A private image can be inspected.** `local-reasoner` (gemma4:26b) reads
+inline images on the LAN box, so a chart or screenshot that must not leave the
+network still gets verified rather than guessed at. This was missed for most of
+this config's life because the vision probe asked models.dev about `ollama/*` —
+a catalog of hosted models has no idea what was pulled onto your own machine.
+The box knows; ask the box. `smoke-agents` now queries ollama's own
+`/api/show` capabilities for local models.
 
 **Kimi is the only tier with measured sight.** Route `inspect` there first when
 Google is unavailable.
@@ -690,7 +699,7 @@ choice*, however good it is otherwise.
 | The task needs | Only these qualify |
 |---|---|
 | To edit a file | Verified tool emission. `local-quick` claims tools in the catalog and does **not** emit them — it answers in prose even at `tool_choice: required`. Catalog capability is not evidence. |
-| To read an image | The **measured** rows of the §5 table: `wide-coder`, `coder`, `architect`, `validator`. Never an `unverified` row, never a text-only one. |
+| To read an image | The **measured** rows of the §5 table: `architect`, `coder`, `wide-coder`, `glm-coder`, `validator`, and `local-reasoner` if it must stay private. Never an `unverified` row, never a text-only one. |
 | More context than 256k | `wide-coder` (1M) is the only implementer above 256k. For read-only work, the 1M rung of §4. |
 | Independence from the author | A different family (§8). Not a different agent on the same model — check §3 for the aliases. |
 | To stay on the LAN | L0 only. Absolute; never traded against quality. |

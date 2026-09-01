@@ -3,6 +3,7 @@
 //   node scripts/sync-check.cjs                 # compare against ~/.config/opencode
 //   node scripts/sync-check.cjs --dest <path>   # or somewhere else
 //   node scripts/sync-check.cjs --json
+//   node scripts/sync-check.cjs --quiet          # print only the drift count
 //
 // This exists because the two directories drifted twice in one session, in
 // both directions, and both times it was noticed by accident:
@@ -27,11 +28,26 @@ const os = require('os');
 
 const argv = process.argv.slice(2);
 const JSON_OUT = argv.includes('--json');
-const DEST = (argv.includes('--dest') && argv[argv.indexOf('--dest') + 1]) ||
-  path.join(os.homedir(), '.config', 'opencode');
+const QUIET = argv.includes('--quiet');
+
+// --dest is parsed strictly, because getting it wrong is the one failure this
+// script must never have. `--dest` with no value, or followed by another
+// flag, used to fall through to the default: under --quiet that printed 0 and
+// exited 0 - an all-clear from a comparison that never ran. A tool whose job
+// is catching silent drift cannot itself fail silently, so this exits 2.
+let DEST = path.join(os.homedir(), '.config', 'opencode');
+if (argv.includes('--dest')) {
+  const v = argv[argv.indexOf('--dest') + 1];
+  if (!v || v.startsWith('--')) {
+    console.error('sync-check: --dest needs a directory path' +
+      (v ? ', got the flag ' + v : ' and none was given'));
+    process.exit(2);
+  }
+  DEST = v;
+}
 const SRC = path.join(__dirname, '..');
 
-const log = (...a) => { if (!JSON_OUT) console.log(...a); };
+const log = (...a) => { if (!JSON_OUT && !QUIET) console.log(...a); };
 
 // What actually gets deployed. Everything else in the repo - git metadata,
 // editor state, fetched catalogs, the worktrees Claude Code owns - is either
@@ -77,6 +93,7 @@ function same(rel) {
 if (!fs.existsSync(DEST)) {
   log('WARN  no deployed config at ' + DEST);
   log('      Nothing to compare. Pass --dest if it lives elsewhere.');
+  if (QUIET) console.log(0);
   process.exitCode = 0;
   return;
 }
@@ -95,6 +112,8 @@ log('');
 
 const drift = onlySrc.length + onlyDst.length + differ.length;
 
+if (QUIET) console.log(drift);
+
 if (!drift) {
   log('OK   ' + srcFiles.size + ' files, repo and deployed config are identical');
 } else {
@@ -107,7 +126,9 @@ if (!drift) {
   log('records the repo copy. Either can discard the other silently.');
 }
 
-if (JSON_OUT) {
+// --quiet wins over --json: a consumer asking for a bare count should not
+// have to care which other flags were passed.
+if (JSON_OUT && !QUIET) {
   console.log(JSON.stringify({ src: SRC, dest: DEST, onlySrc, onlyDst, differ }, null, 2));
 }
 

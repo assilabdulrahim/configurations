@@ -18,9 +18,9 @@ permission:
     "git log *": allow
     # Absolute, because the router's cwd is the user's project, not the
     # config dir - a relative "scripts/..." only resolves when they coincide.
-    "node ~/.config/opencode/scripts/preflight.cjs*": allow
-    "node ~/.config/opencode/scripts/ctx-estimate.cjs*": allow
-    "node ~/.config/opencode/scripts/sync-check.cjs*": allow
+    "node C:/Users/AssilAbdulrahim/.config/opencode/scripts/preflight.cjs*": allow
+    "node C:/Users/AssilAbdulrahim/.config/opencode/scripts/ctx-estimate.cjs*": allow
+    "node C:/Users/AssilAbdulrahim/.config/opencode/scripts/sync-check.cjs*": allow
     "node scripts/preflight.cjs*": allow
     "node scripts/ctx-estimate.cjs*": allow
   webfetch: ask
@@ -174,17 +174,24 @@ Rules that give this teeth:
 You have two tools. Use them; do not reason your way to an answer either can
 give you directly.
 
-**Invoke them by absolute path.** Your working directory is whatever project
-the user is in, and it is almost never the config directory - so a relative
-`scripts/preflight.cjs` resolves against their repo, finds nothing, and dies
-with MODULE_NOT_FOUND. The scripts themselves are cwd-independent; only the
-path you type is not. `~/.config/opencode/scripts/...` works from anywhere and
-is what the allow-list permits, so it also runs without prompting.
+**Invoke them by full absolute path**, exactly as written below. Two separate
+things make anything shorter fail:
+
+- Your working directory is whatever project the user is in, almost never the
+  config directory, so a relative `scripts/preflight.cjs` resolves against
+  their repo and dies with MODULE_NOT_FOUND.
+- `~` is a shell feature, not a path. Bash and PowerShell expand it; **cmd.exe
+  does not**, and hands node a literal directory named `~`. `%USERPROFILE%` has
+  the mirror-image problem and `$HOME` fails in cmd too. No portable short form
+  exists - the absolute path is the only spelling that survives every shell
+  this app might launch.
+
+The scripts themselves are cwd-independent; only the path you type is not.
 
 ## Provider health — once per session, and after any provider failure
 
 ```
-node ~/.config/opencode/scripts/preflight.cjs
+node C:/Users/AssilAbdulrahim/.config/opencode/scripts/preflight.cjs
 ```
 
 Reports which providers are authenticated, whether the Ollama box is up,
@@ -198,7 +205,7 @@ auth, credit or rate-limit error. Record the result in the ledger under
 ## Context size — before routing anything spanning more than ~3 files
 
 ```
-node ~/.config/opencode/scripts/ctx-estimate.cjs <paths>     # or --diff, or --repo
+node C:/Users/AssilAbdulrahim/.config/opencode/scripts/ctx-estimate.cjs <paths>     # or --diff, or --repo
 ```
 
 Prints an estimated token count and which tiers hold it: `FITS` (under 60% of
@@ -592,7 +599,7 @@ reads `-`:
 
 ```
 curl -s https://models.dev/api.json -o /tmp/models.json
-MODELS_JSON=/tmp/models.json node ~/.config/opencode/scripts/smoke-agents.cjs --paid --agent validator
+MODELS_JSON=/tmp/models.json node C:/Users/AssilAbdulrahim/.config/opencode/scripts/smoke-agents.cjs --paid --agent validator
 ```
 
 Two traps worth knowing, both of which cost an hour to find:

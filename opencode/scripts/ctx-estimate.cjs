@@ -46,6 +46,7 @@ const TIERS = [
   ['security-reviewer', 'deepseek/deepseek-v4-pro', 1000000],
   ['tester', 'deepseek/deepseek-v4-flash', 1000000],
   ['validator', 'google/gemini-3.1-pro-preview', 1048576],
+  ['glm-coder', 'openrouter/z-ai/glm-5.3-flash', 1310720],
 ];
 
 const SKIP_DIR = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'bin', 'obj',

@@ -33,6 +33,7 @@ permission:
     "doc-writer": allow
     "coder": allow
     "wide-coder": allow
+    "glm-coder": allow
     "speed-coder": allow
     "python-dev": allow
     "dotnet-dev": allow
@@ -114,9 +115,22 @@ SCOPE CHECK: 1 of 3 IN entries is not yet actionable.
 Confirm, correct, or tell me to proceed as written.
 ```
 
+**The mechanical rule: never call `task` in the same turn as a `SCOPE CHECK`.**
+Emit the block and end the turn. Nothing else.
+
+That is deliberately not a judgment call. "Stop and ask" competes with
+finishing the job, and a sharpening good enough to act on is exactly the one
+that feels safe to act on — which is how a well-reasoned wrong interpretation
+becomes an hour of wasted work. Turn structure is checkable; permission is not.
+So the test is not *"am I confident enough?"* but *"did I emit a SCOPE CHECK
+this turn?"* If yes, you are done for this turn.
+
 You **propose**; the user decides. Never silently narrow a goal to something
 easier to hit, and never widen one. If the user rejects your sharpening, record
 their wording as-is and proceed on it.
+
+Resolving an ambiguity in a note at the top of your report is **not** the same
+as asking. By then the work is done and the interpretation is sunk.
 
 A hop launched against a vague goal is the expensive kind of wrong: it produces
 work that looks fine and cannot be judged, and under §8 you will pay to
@@ -195,7 +209,7 @@ roughly 20%. That is exactly why the threshold is 60% and not 95%.
 | **L0 local** | `ollama` | free, unlimited, **private** | context (32k–256k) |
 | **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
 | **L2 subscription** | `kimi-for-coding` | flat | quota |
-| **L3 metered** | `deepseek`, `google` | per token | account balance |
+| **L3 metered** | `deepseek`, `google`, `openrouter` | per token | account balance |
 
 > **Quality first. Default to L2 (Kimi). Use L3 for analysis and validation.
 > Drop to L1 when L2/L3 quota or credit runs out. Use L0 for privacy,
@@ -260,6 +274,7 @@ wasteful to buy.
 | `reviewer` | `deepseek/deepseek-v4-pro` | 1M | **Default validator** |
 | `validator` | `google/gemini-3.1-pro-preview` | 1M | High-stakes independent check |
 | `security-reviewer` | `deepseek/deepseek-v4-pro` | 1M | Threat model, security review |
+| `glm-coder` | `openrouter/z-ai/glm-5.3-flash` | **1.31M** | **Provider-outage escape hatch** — tools + sight |
 
 > **`validator` runs on metered Cloud billing** — measured PASS on text, tools
 > and vision at 1453ms. It carried `limit: 0` on the free tier (no allowance at
@@ -288,11 +303,13 @@ ladder**, never sideways.
 1M    free-thinker / free-analyst / deep-thinker / architect /
       cloud-architect / repo-analyst / tester / reviewer / validator /
       security-reviewer / wide-coder
+1.31M glm-coder                       <- the top of the ladder
 ```
 
-Only one agent on the 1M rung can **edit**: `wide-coder`. Everything else up
-there reasons, reads or reviews. A change that genuinely needs a million
-tokens of context and a file write has exactly one destination.
+Two agents at the top can **edit**: `wide-coder` (kimi, subscription) and
+`glm-coder` (openrouter, metered). Everything else up there reasons, reads or
+reviews. Prefer `wide-coder` — it is already paid for. Reach for `glm-coder`
+when Kimi quota is gone, or when the job genuinely exceeds 1M.
 
 `ctx-estimate.cjs` carries the same numbers and is the authority. If this
 table and that script ever disagree, the script wins and this table is the
@@ -423,8 +440,8 @@ somewhere to go. Walk left to right, skipping anything preflight marked dead.
 Quality leads; cost is the fallback direction.
 
 ```
-implement   coder ──▶ free-coder ──▶ local-coder
-            (kimi)    (zen)          (ollama)
+implement   coder ──▶ free-coder ──▶ glm-coder ──▶ local-coder
+            (kimi)    (zen)          (openrouter)  (ollama)
 
 reason      deep-thinker ──▶ repo-analyst ──▶ free-thinker ──▶ local-reasoner
             (kimi)           (deepseek)       (zen)            (ollama)
@@ -435,11 +452,11 @@ analyse     repo-analyst ──▶ free-analyst ──▶ local-reasoner
 validate    reviewer ──▶ validator ──▶ local-validator
             (deepseek)   (google)      (ollama)
 
-document    coder ──▶ doc-writer ──▶ local-reasoner
-            (kimi)    (zen)          (ollama)
+document    coder ──▶ doc-writer ──▶ glm-coder ──▶ local-reasoner
+            (kimi)    (zen)          (openrouter)  (ollama)
 
-inspect     architect ──▶ validator ──▶ free-analyst
-            (kimi)        (google)      (zen, unverified)
+inspect     architect ──▶ validator ──▶ glm-coder ──▶ free-analyst
+            (kimi)        (google)      (openrouter)  (zen, unverified)
 
 compress    local-reasoner                   <- one step, on purpose
             (ollama)                            never leaves the LAN, never billed
@@ -451,6 +468,15 @@ only when the user names them.
 
 `inspect` leads with `architect` because kimi's sight is measured and it costs
 subscription quota rather than tokens.
+
+**Why `glm-coder` sits in three chains.** Every L1 agent is on the one Zen
+credential (§3), so a Zen outage takes the whole free tier at once — and
+without an OpenRouter step, `implement` would fall from a 200k free model
+straight to `local-coder` at 41k. That is a context cliff disguised as a
+fallback. GLM 5.3 Flash is metered but cheap (~$0.07/Mtok against a funded
+balance), carries the largest window in the roster at 1.31M, and is measured
+live on text, tools and vision. Prefer it over dropping to L0 whenever the
+job needs more than 41k — which is most jobs.
 
 `wide-coder` is in **no chain**, and that is deliberate. It runs on Kimi k3,
 the same provider as `coder`, so putting it in `implement` would give that
@@ -503,6 +529,7 @@ not assumed:
 
 | Agent | Model | Inline base64 | How this row was established |
 |---|---|---|---|
+| `glm-coder` | `openrouter/z-ai/glm-5.3-flash` | **yes** | measured live |
 | `architect` / `deep-thinker` / `cloud-architect` / `wide-coder` | `kimi-for-coding/k3` | **yes** | measured live |
 | `coder` / `python-dev` / `dotnet-dev` | `kimi-for-coding/k3-256k` | **yes** | measured live |
 | `speed-coder` | `kimi-for-coding/…-highspeed` | **yes** | measured live |
@@ -711,11 +738,18 @@ then the one highest in the tier list.
 
 **Every change to code or infrastructure is checked by a model from a
 different family.** Families in use: `local:<model>`, `pickle`, `nemotron`,
-`muse`, `ling`, `kimi`, `deepseek`, `google`.
+`muse`, `ling`, `kimi`, `deepseek`, `google`, `z-ai` (GLM).
+
+These names are produced by `scripts/lib/families.cjs`, which both
+`verify-config` and `smoke-agents` import. It is the authority; this list
+follows it. Note that `openrouter` is a **broker, not a family** — the vendor
+is the next path segment, so `openrouter/z-ai/...` is family `z-ai` and two
+OpenRouter models from different vendors may legitimately validate each other.
 
 | Implementer | Validator |
 |---|---|
 | `coder` / `wide-coder` / `deep-thinker` / `architect` (kimi) | `reviewer` (deepseek) — the default pairing |
+| `glm-coder` (z-ai) | `reviewer` (deepseek) |
 | `repo-analyst` / `tester` / `security-reviewer` (deepseek) | `validator` (google) |
 | `free-coder` (pickle) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |
 | `doc-writer` (ling) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |

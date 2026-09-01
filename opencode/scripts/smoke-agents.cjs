@@ -60,18 +60,28 @@ const OR_ATTRIB = { 'HTTP-Referer': 'https://opencode.ai', 'X-Title': 'opencode'
 
 // provider -> how to reach an OpenAI-shaped /chat/completions for it
 const ENDPOINT = {
-  ollama: () => [OLLAMA + '/v1/chat/completions', {}, 'local'],
+  ollama: () => [OLLAMA + '/v1/chat/completions', {}],
   openrouter: k => ['https://openrouter.ai/api/v1/chat/completions',
-    { Authorization: 'Bearer ' + k, ...OR_ATTRIB }, 'free'],
-  deepseek: k => ['https://api.deepseek.com/chat/completions', { Authorization: 'Bearer ' + k }, 'paid'],
-  'kimi-for-coding': k => ['https://api.kimi.com/coding/v1/chat/completions', { Authorization: 'Bearer ' + k }, 'paid'],
+    { Authorization: 'Bearer ' + k, ...OR_ATTRIB }],
+  deepseek: k => ['https://api.deepseek.com/chat/completions', { Authorization: 'Bearer ' + k }],
+  'kimi-for-coding': k => ['https://api.kimi.com/coding/v1/chat/completions', { Authorization: 'Bearer ' + k }],
   google: k => ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    { Authorization: 'Bearer ' + k }, 'paid'],
-  opencode: k => ['https://opencode.ai/zen/v1/chat/completions', { Authorization: 'Bearer ' + k }, 'paid'],
+    { Authorization: 'Bearer ' + k }],
+  opencode: k => ['https://opencode.ai/zen/v1/chat/completions', { Authorization: 'Bearer ' + k }],
   // models.dev lists minimax's base as .../anthropic/v1, but it also serves an
   // OpenAI-shaped /v1/chat/completions - verified 200 with a choices[] body.
-  minimax: k => ['https://api.minimax.io/v1/chat/completions', { Authorization: 'Bearer ' + k }, 'paid'],
+  minimax: k => ['https://api.minimax.io/v1/chat/completions', { Authorization: 'Bearer ' + k }],
 };
+
+// Tier is per-MODEL, not per-provider: opencode (Zen) hosts both the free L1
+// roster (big-pickle and every *-free id) and paid models, so a provider-level
+// label would skip the entire L1 tier in the default no-cost run.
+function tierOf(model) {
+  const i = model.indexOf('/'), prov = model.slice(0, i), id = model.slice(i + 1);
+  if (prov === 'ollama') return 'local';
+  if (prov === 'opencode' && (id === 'big-pickle' || id.endsWith('-free'))) return 'free';
+  return 'paid';
+}
 
 // Two ways to hand a model an image, and they are NOT interchangeable:
 //   INLINE  a base64 data: URL - the bytes travel in the request
@@ -148,16 +158,10 @@ function agentPins() {
   return out;
 }
 
-// Same rule as verify-config.cjs: openrouter is a broker, so the vendor is the
-// segment after it. Duplicated deliberately - this script must run even if the
-// catalogs verify-config needs are not present.
-function family(m) {
-  if (m.startsWith('ollama/')) return 'local:' + m.split('/')[1].split(':')[0];
-  if (/^(moonshotai|kimi-for-coding)\//.test(m)) return 'kimi';
-  if (m.startsWith('openrouter/')) return m.split('/')[1];
-  if (m.startsWith('opencode/')) return m.split('/')[1].split('-')[0];
-  return m.split('/')[0];
-}
+// Shared with verify-config.cjs via scripts/lib/families.cjs - the family
+// names must match agents/orchestrator.md §8 exactly. The module is pure
+// string mapping, so this script still runs without the models.dev catalog.
+const { family } = require(path.join(__dirname, 'lib', 'families.cjs'));
 
 function chains() {
   const src = fs.readFileSync(path.join(ROOT, 'agents', 'orchestrator.md'), 'utf8');
@@ -189,7 +193,8 @@ function chains() {
     if (!mk) { results[name] = { skipped: 'no endpoint mapping for ' + prov }; continue; }
     const k = prov === 'ollama' ? 'ollama' : key(prov);
     if (!k) { results[name] = { skipped: 'provider not authenticated' }; continue; }
-    const [url, headers, tier] = mk(k);
+    const [url, headers] = mk(k);
+    const tier = tierOf(model);
     if (tier === 'paid' && !PAID) { results[name] = { skipped: 'paid tier (pass --paid)' }; continue; }
 
     // Local models are called cold: the first request to a 70B includes load

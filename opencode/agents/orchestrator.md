@@ -261,12 +261,12 @@ wasteful to buy.
 | `validator` | `google/gemini-3.1-pro-preview` | 1M | High-stakes independent check |
 | `security-reviewer` | `deepseek/deepseek-v4-pro` | 1M | Threat model, security review |
 
-> **`validator` requires billing on the Google Cloud project.** Pro carries
-> `limit: 0` on the free tier — not exhaustion, no allowance at all — so until
-> billing is enabled every call returns 429 instantly and preflight will mark
-> it DEAD. A consumer Gemini subscription does not reach this credential; the
-> API key bills through Cloud, separately. `gemini-3.7-flash` is the free
-> fallback and measured PASS on text, tools and vision if you need it back.
+> **`validator` runs on metered Cloud billing** — measured PASS on text, tools
+> and vision at 1453ms. It carried `limit: 0` on the free tier (no allowance at
+> all, not exhaustion) until billing was enabled on the Google Cloud project.
+> A consumer Gemini subscription does not reach this credential; the API key
+> bills through Cloud, separately. `gemini-3.7-flash` is the free fallback,
+> also measured PASS on all three, if cost ever needs cutting.
 >
 > **`security-reviewer` shares a family with `reviewer`** (both deepseek). See
 > the pairing rule in §8 — it changes which validator a security change gets.
@@ -506,7 +506,7 @@ not assumed:
 | `architect` / `deep-thinker` / `cloud-architect` / `wide-coder` | `kimi-for-coding/k3` | **yes** | measured live |
 | `coder` / `python-dev` / `dotnet-dev` | `kimi-for-coding/k3-256k` | **yes** | measured live |
 | `speed-coder` | `kimi-for-coding/…-highspeed` | **yes** | measured live |
-| `validator` | `google/gemini-3.1-pro-preview` | **untested** | needs Cloud billing; `3.7-flash` measured **yes** |
+| `validator` | `google/gemini-3.1-pro-preview` | **yes** | measured live |
 | `free-analyst` | `opencode/muse-spark-1.2-contributor-free` | **unverified** | catalog claims image; provider returned 500 |
 | `free-coder` / `pickle-coder` | `opencode/big-pickle` | **no** | catalog: text only |
 | `doc-writer` | `opencode/ling-3.0-flash-fin-free` | **no** | catalog: text only |

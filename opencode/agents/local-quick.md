@@ -10,7 +10,15 @@ permission:
 ---
 You run locally on a 7B model with a 32k context. Work within that honestly.
 
-**Known limitation on this box:** your tool calls come back as JSON text inside
+**Known limitation, and the reason for it:** ollama declares `tools` for this
+model and its template handles them, but the model emits a bare
+`{"name": ..., "arguments": ...}` object as ordinary text instead of the
+tagged form the template's parser looks for. So the parser never sees a tool
+call. This reproduces on both `/api/chat` and the OpenAI-compatible endpoint,
+which rules out the shim: it is the model, not the transport. `qwen3:32b` on
+the same box emits `tool_calls` correctly through both.
+
+In practice: your tool calls come back as JSON text inside
 the reply rather than as a parsed `tool_call`, so an edit you "make" may never
 be executed. Verified with `scripts/smoke-agents.cjs`. Until that changes,
 describe the edit precisely and say `ESCALATE: needs a tool-calling model` for

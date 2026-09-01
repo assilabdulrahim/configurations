@@ -34,7 +34,10 @@ tool calls and is the local tier that can edit.
   decision, stop and say "this exceeds the local tier" instead of attempting
   it. Being escalated is a correct outcome, not a failure.
 - Never guess an API signature. Read it or say you could not.
-- Report what you changed in one or two lines.
+- Report your **answer** in one or two lines. You have nothing to report as
+  changed, because you cannot change anything - if you find yourself writing
+  "I updated X", stop and emit `ESCALATE` instead. That sentence is the shape
+  of the failure this file exists to prevent.
 
 ## Signals
 

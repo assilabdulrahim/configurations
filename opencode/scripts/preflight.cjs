@@ -156,9 +156,26 @@ async function head(url, headers, timeoutMs = 8000) {
     } else log('  ?    moonshotai      balance query returned ' + r.status);
   } else log('  -    moonshotai      not authenticated');
 
+  // openrouter used to be free-tier only, where the first sign of trouble was
+  // a 429 at call time. It is metered now - glm-coder sits in three fallback
+  // chains - and it does expose a balance, so read it rather than guess.
+  if (key('openrouter')) {
+    const r = await head('https://openrouter.ai/api/v1/credits',
+      { Authorization: 'Bearer ' + key('openrouter') });
+    if (r.status === 200) {
+      const d = (JSON.parse(r.body) || {}).data || {};
+      const left = Number(d.total_credits) - Number(d.total_usage);
+      const state = !(left > 0) ? 'EMPTY'
+        : left < DEEPSEEK_CRITICAL_USD ? 'CRITICAL'
+          : left < DEEPSEEK_LOW_USD ? 'LOW' : 'OK';
+      out.balances.openrouter = { total: d.total_credits, used: d.total_usage, left, state };
+      log('  ' + (state === 'OK' ? 'OK  ' : state.padEnd(4)) + ' openrouter      ' +
+        (isNaN(left) ? '?' : left.toFixed(2)) + ' USD left of ' + d.total_credits);
+    } else log('  ?    openrouter      balance query returned ' + r.status);
+  } else log('  -    openrouter      not authenticated');
+
   log('  -    kimi-for-coding subscription: no balance API. 429/402 at call time is the only signal.');
-  log('  -    openrouter      free tier: no balance API. 429 at call time is the only signal.');
-  log('  -    google          no balance API exposed here.');
+  log('  -    google          metered via Cloud billing; no balance API exposed here.');
 
   // ---- 3b. does each credential actually WORK? ------------------------
   // A key sitting in auth.json proves nothing: a revoked OpenRouter key is

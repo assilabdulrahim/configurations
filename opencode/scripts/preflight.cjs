@@ -1,6 +1,6 @@
 // Preflight: what can actually run right now.
 //
-//   node scripts/preflight.cjs [--json]
+//   node scripts/preflight.cjs [--json] [--version]
 //
 // Answers three questions the router cannot answer by reasoning:
 //   1. Which providers are authenticated?  (so which agents are reachable)
@@ -17,6 +17,24 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execSync } = require('child_process');
+
+// --version: print the config directory's own git HEAD and stop. The config
+// lives outside the project repos it serves, so this is the SHA of the
+// config's repository, not of the repo the router happens to be running in.
+if (process.argv.includes('--version')) {
+  try {
+    const sha = execSync('git rev-parse HEAD', {
+      cwd: path.join(__dirname, '..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    console.log(sha);
+  } catch (e) {
+    console.error(String((e && e.stderr) || (e && e.message) || e).trim());
+  }
+  process.exit(0);
+}
 
 // Global fetch is Node 18+. Without this the failure is a bare ReferenceError
 // from inside head(), which reads like a bug in this script rather than an

@@ -118,7 +118,7 @@ Catches:
 - **a validator sharing a model family with any implementer**, which would
   silently defeat cross-model validation. Family names follow
   `agents/orchestrator.md` §8 — `local:<model>`, `pickle`, `nemotron`, `muse`,
-  `ling`, `kimi`, `deepseek`, `google` — and the mapping is shared with
+  `ling`, `kimi`, `deepseek`, `google`, `z-ai` — and the mapping is shared with
   `smoke-agents.cjs` via `scripts/lib/families.cjs`
 - **drift or missing coverage between `ctx-estimate.cjs`'s tier table and the
   real agent pins**, including a context window that disagrees with

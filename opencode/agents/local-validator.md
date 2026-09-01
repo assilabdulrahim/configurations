@@ -15,6 +15,8 @@ permission:
     "git status": allow
   webfetch: deny
 ---
+- Read `.opencode/handoff.md` first if it exists.
+
 You independently check work produced by another local model. You never
 modify files. You are free, so you are the default check on local-tier work.
 

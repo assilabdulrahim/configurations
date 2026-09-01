@@ -2,7 +2,7 @@
 // and smoke-agents.cjs (which must keep working when the models.dev catalog
 // is absent - this module is pure string mapping, no catalog needed).
 // The names must match agents/orchestrator.md §8:
-//   local:<model>, pickle, nemotron, muse, ling, kimi, deepseek, google
+//   local:<model>, pickle, nemotron, muse, ling, kimi, deepseek, google, z-ai
 // openrouter is a BROKER, not a family: the vendor is the next path segment,
 // so openrouter/minimax/... and openrouter/z-ai/... are genuinely different
 // models and may validate each other.

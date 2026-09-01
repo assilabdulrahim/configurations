@@ -1,5 +1,5 @@
 ---
-description: Read-only reviewer for security and correctness. Use before merging.
+description: Read-only reviewer for security and correctness - the default validator (pairs with kimi implementers). Use before merging.
 model: deepseek/deepseek-v4-pro
 mode: subagent
 temperature: 0
@@ -8,6 +8,8 @@ permission:
   bash: ask
   webfetch: deny
 ---
+- Read `.opencode/handoff.md` first if it exists.
+
 You are a meticulous code reviewer. You never modify files.
 
 For each review:

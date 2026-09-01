@@ -100,6 +100,21 @@ for (const s of [...orch.matchAll(/^\| [^|]+ \| `([a-z-]+)` \| `([a-z-]+)` \|$/g
 }
 console.log('OK   router skill table resolves');
 
+// --- 3.5 agent structure: orchestrator is primary, everything else is a
+//        subagent, and every agent carries a non-empty description - this is
+//        what keeps description/role drift mechanically visible
+console.log('\n-- agent structure --');
+for (const a of [...agents].sort()) {
+  const fm = fs.readFileSync(path.join(ROOT, 'agents', a + '.md'), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fm) { bad('agents/' + a + '.md: no frontmatter'); continue; }
+  const mode = (fm[1].match(/^mode:\s*(\S+)/m) || [])[1];
+  const desc = (fm[1].match(/^description:\s*(\S.*)$/m) || [])[1];
+  const want = a === 'orchestrator' ? 'primary' : 'subagent';
+  if (mode !== want) { bad(a + ': mode "' + mode + '" - expected "' + want + '"'); continue; }
+  if (!desc) { bad(a + ': empty or missing description'); continue; }
+  console.log('OK   ' + a.padEnd(19) + 'mode=' + mode);
+}
+
 // --- 4. commands point at real agents
 console.log('\n-- commands --');
 for (const [n, c] of Object.entries(cfg.command || {})) {
@@ -126,7 +141,7 @@ console.log('\n-- cross-model validation --');
 const { family: fam } = require(path.join(__dirname, 'lib', 'families.cjs'));
 const impl = ['local-quick', 'local-coder', 'local-reasoner', 'free-coder', 'pickle-coder',
   'free-thinker', 'free-analyst', 'doc-writer', 'coder', 'speed-coder', 'python-dev',
-  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder'];
+  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder'];
 const vals = ['free-validator', 'local-validator', 'reviewer', 'validator', 'security-reviewer'];
 for (const a of [...impl, ...vals]) console.log('     ' + a.padEnd(19) + fam(pin(a)));
 for (const v of vals) for (const i of impl)

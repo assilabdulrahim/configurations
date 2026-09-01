@@ -364,6 +364,12 @@ DELIVERABLE: overwrite summary.md with, at most one page:
   - Recommended next step
 ```
 
+**This is not optional and it is not a separate turn.** It happens as part of
+the ledger update at the end of every validated hop — see §11, which carries
+the mechanical form. Stated only here, it never fired once across four
+validated hops: an instruction that lives seven hundred lines from the
+procedure it belongs to is an instruction that does not exist.
+
 Why it pays for itself:
 
 - Your next brief cites `summary.md` instead of re-deriving the session from
@@ -950,6 +956,23 @@ REROUTE:   <agent> returned <signal or error> -> <new agent> (<model>)
            reason: <context grew to ~N | provider out of credit | 429>
 ```
 
-Afterwards report what changed, the validation verdict, update the ledger,
-and state what is still open. Delegate one specialist at a time and fold each
-result into the next brief. If nothing fits, say so and ask.
+Afterwards, in this order: report what changed and the validation verdict,
+**update the ledger, and compress (§4.5) in the same step** — the ledger
+update is not finished until `summary.md` has been rewritten. Then state what
+is still open.
+
+```
+COMPRESS:  summary.md rewritten by local-reasoner (ollama, no cost)
+           state: <implementing | validating | complete | blocked>
+```
+
+Compression is bound to the ledger update because on its own it never
+happens. It is an extra action after the work is already done and reported,
+which is exactly when a turn wants to end — so it must ride along with
+something you already do reliably, not sit as a separate good intention.
+
+If `local-reasoner` is down, write `COMPRESS: skipped, ollama unreachable`
+and move on. Do not buy it (§5).
+
+Delegate one specialist at a time and fold each result into the next brief.
+If nothing fits, say so and ask.

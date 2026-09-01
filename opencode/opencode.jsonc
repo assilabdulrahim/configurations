@@ -2,31 +2,30 @@
   "$schema": "https://opencode.ai/config.json",
 
   // ── Cost posture ─────────────────────────────────────────────
-  // Three cost classes, cheapest first:
+  // Four cost classes:
   //
-  //   LOCAL         Ollama box on the LAN. Free, unlimited, PRIVATE.
-  //                 Weak on capability: 32k-256k context.
-  //   FREE          OpenRouter free tier (minimax, nemotron, glm, inkling),
-  //                 plus OpenCode Zen free models (big-pickle, kimi-k2.5-free,
-  //                 deepseek-v4-flash-free, +24 more) once `opencode auth
-  //                 login` has been run for the opencode provider.
-  //                 Free, 200k-1M context, tool-capable, genuinely strong.
-  //   SUBSCRIPTION  Kimi and Anthropic. Flat cost but FINITE QUOTA.
+  //   L0 LOCAL         Ollama box on the LAN. Free, unlimited, PRIVATE.
+  //                    Weak on capability: 32k-256k context.
+  //   L1 FREE          OpenCode Zen free models (big-pickle, nemotron,
+  //                    muse, ling) - the whole tier sits on the opencode
+  //                    provider. Free, 200k-1M context, tool-capable.
+  //   L2 SUBSCRIPTION  Kimi. Flat cost but FINITE QUOTA. The default tier.
+  //   L3 METERED       DeepSeek, Google. Per-token. Analysis + validation.
   //
-  // The rule the router follows:
+  // The rule the router follows (agents/orchestrator.md §2):
   //
-  //   Default to the free tier. Drop to local only for privacy or trivia.
-  //   Spend subscription quota only when free stalls or stakes are high.
+  //   Quality first. Default to L2 (Kimi). Use L3 for analysis and
+  //   validation. Drop to L1 when L2/L3 quota or credit runs out.
+  //   Use L0 for privacy, compression and trivia.
   //   Never validate a model's work with the same model.
   //
-  // The free Zen models beat the local box on context and capability at the
-  // same price. Local wins on exactly one axis: the code never leaves the
-  // LAN. The full escalation ladder is in agents/orchestrator.md.
+  // L0 keeps two jobs nothing else should take: work that must not leave
+  // the LAN, and session compression, which is high-volume and mechanical.
+  // The full escalation ladder is in agents/orchestrator.md.
 
-  // Default when no agent is selected. A free OpenRouter model - 1M context,
-  // tool-capable, costs nothing, and openrouter is ALREADY authenticated.
-  // (opencode/big-pickle is the nicer default but needs `opencode auth login`
-  // for the opencode provider first - see scripts/preflight.cjs.)
+  // Default when no agent is selected. A free OpenCode Zen model - 200k
+  // context, tool-capable, costs nothing, and the opencode provider is
+  // already authenticated (see scripts/preflight.cjs).
   "model": "opencode/big-pickle",
 
   // Title generation / bookkeeping only. Kept local so it never touches quota.

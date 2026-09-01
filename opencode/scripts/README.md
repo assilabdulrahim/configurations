@@ -97,6 +97,9 @@ curl -s http://192.168.86.24:11434/api/tags -o /tmp/tags.json
 node scripts/verify-config.cjs /tmp
 ```
 
+Runs from any directory — repo paths resolve relative to the script, not the
+cwd. The argument is only the catalog directory.
+
 Catches:
 
 - `opencode.jsonc` no longer parsing — the stripper is string-aware, so the
@@ -113,10 +116,13 @@ Catches:
   router routes to but which does not exist
 - a `command` pointing at a missing agent
 - **a validator sharing a model family with any implementer**, which would
-  silently defeat cross-model validation. It knows OpenRouter is a *broker*,
-  so `openrouter/minimax/…` and `openrouter/z-ai/…` count as different
-  families
-- **drift between `ctx-estimate.cjs`'s tier table and the real agent pins**
+  silently defeat cross-model validation. Family names follow
+  `agents/orchestrator.md` §8 — `local:<model>`, `pickle`, `nemotron`, `muse`,
+  `ling`, `kimi`, `deepseek`, `google`, `z-ai` — and the mapping is shared with
+  `smoke-agents.cjs` via `scripts/lib/families.cjs`
+- **drift or missing coverage between `ctx-estimate.cjs`'s tier table and the
+  real agent pins**, including a context window that disagrees with
+  models.dev and any agent with no TIERS entry at all
 - a fallback chain in the router naming an agent that does not exist
 
 It also labels each model FREE / SUBSCRIPTION / metered, because models.dev
@@ -127,8 +133,9 @@ reports zero cost for subscription plans and that is easy to misread.
 ## `smoke-agents.cjs` — does the design hold at call time?
 
 ```bash
-node scripts/smoke-agents.cjs           # free + local tiers, costs nothing
+node scripts/smoke-agents.cjs           # free (Zen) + local tiers, costs nothing
 node scripts/smoke-agents.cjs --paid    # + kimi / deepseek / google / zen
+node scripts/smoke-agents.cjs --all     # alias of --paid
 node scripts/smoke-agents.cjs --agent free-coder
 node scripts/smoke-agents.cjs --json
 ```

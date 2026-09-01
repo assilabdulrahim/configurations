@@ -1,7 +1,10 @@
-// Verifies the opencode config against reality. Run from the opencode/ dir:
+// Verifies the opencode config against reality. Runs from any directory:
 //   node scripts/verify-config.cjs <dir with models.json and tags.json>
-// See scripts/README.md for how to fetch those two catalogs.
+// Repo paths resolve relative to this script, not the cwd. The catalog dir
+// argument stays as given. See scripts/README.md for how to fetch the catalogs.
 const fs = require('fs');
+const path = require('path');
+const ROOT = path.join(__dirname, '..');
 const SP = process.argv[2] || '.';
 const BACKSLASH = String.fromCharCode(92);
 
@@ -28,14 +31,14 @@ function stripJsonc(s) {
 let fail = 0;
 const bad = m => { console.log('FAIL ' + m); fail++; };
 
-const cfg = JSON.parse(stripJsonc(fs.readFileSync('opencode.jsonc', 'utf8')));
+const cfg = JSON.parse(stripJsonc(fs.readFileSync(path.join(ROOT, 'opencode.jsonc'), 'utf8')));
 console.log('OK   opencode.jsonc parses as JSONC');
 
 const md = require(SP + '/models.json');
 const local = new Set(require(SP + '/tags.json').models.map(m => m.name));
-const agentFiles = fs.readdirSync('agents').filter(f => f.endsWith('.md'));
+const agentFiles = fs.readdirSync(path.join(ROOT, 'agents')).filter(f => f.endsWith('.md'));
 const agents = new Set(agentFiles.map(f => f.replace(/\.md$/, '')));
-const pin = a => (fs.readFileSync('agents/' + a + '.md', 'utf8').match(/^model:\s*(\S+)/m) || [])[1];
+const pin = a => (fs.readFileSync(path.join(ROOT, 'agents', a + '.md'), 'utf8').match(/^model:\s*(\S+)/m) || [])[1];
 
 // --- 1. every agent pins a model that actually resolves, with tool calling
 console.log('\n-- agent model pins --');
@@ -60,7 +63,7 @@ for (const a of [...agents].sort()) {
 
 // --- 2. router allow-list matches the agents on disk
 console.log('\n-- router wiring --');
-const orch = fs.readFileSync('agents/orchestrator.md', 'utf8');
+const orch = fs.readFileSync(path.join(ROOT, 'agents', 'orchestrator.md'), 'utf8');
 // A verifier must not die on the thing it is verifying: if the frontmatter
 // moves or the section disappears, report a FAIL and carry on with the rest.
 const taskBlock = orch.includes('  task:')
@@ -75,10 +78,10 @@ for (const a of agents) if (a !== 'orchestrator' && !named.includes(a)) console.
 // --- 3. skills are well formed, and every skill the router names exists
 console.log('\n-- skills --');
 const skills = new Set();
-for (const d of fs.readdirSync('skills', { withFileTypes: true }).filter(d => d.isDirectory())) {
+for (const d of fs.readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true }).filter(d => d.isDirectory())) {
   const p = 'skills/' + d.name + '/SKILL.md';
-  if (!fs.existsSync(p)) { bad('skills/' + d.name + ': no SKILL.md'); continue; }
-  const fm = fs.readFileSync(p, 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fs.existsSync(path.join(ROOT, p))) { bad(p + ': no SKILL.md'); continue; }
+  const fm = fs.readFileSync(path.join(ROOT, p), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!fm) { bad(p + ': no frontmatter'); continue; }
   const name = (fm[1].match(/^name:\s*(\S+)/m) || [])[1];
   const desc = (fm[1].match(/^description:\s*(.+)$/m) || [])[1];
@@ -86,8 +89,8 @@ for (const d of fs.readdirSync('skills', { withFileTypes: true }).filter(d => d.
   else if (!desc) bad(p + ': no description');
   else {
     skills.add(name);
-    const refs = fs.existsSync('skills/' + name + '/references')
-      ? fs.readdirSync('skills/' + name + '/references').length : 0;
+    const refs = fs.existsSync(path.join(ROOT, 'skills', name, 'references'))
+      ? fs.readdirSync(path.join(ROOT, 'skills', name, 'references')).length : 0;
     console.log('OK   ' + name.padEnd(19) + refs + ' reference file(s)');
   }
 }
@@ -96,6 +99,21 @@ for (const s of [...orch.matchAll(/^\| [^|]+ \| `([a-z-]+)` \| `([a-z-]+)` \|$/g
   if (!agents.has(s[2])) bad('router routes skill ' + s[1] + ' to missing agent: ' + s[2]);
 }
 console.log('OK   router skill table resolves');
+
+// --- 3.5 agent structure: orchestrator is primary, everything else is a
+//        subagent, and every agent carries a non-empty description - this is
+//        what keeps description/role drift mechanically visible
+console.log('\n-- agent structure --');
+for (const a of [...agents].sort()) {
+  const fm = fs.readFileSync(path.join(ROOT, 'agents', a + '.md'), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!fm) { bad('agents/' + a + '.md: no frontmatter'); continue; }
+  const mode = (fm[1].match(/^mode:\s*(\S+)/m) || [])[1];
+  const desc = (fm[1].match(/^description:\s*(\S.*)$/m) || [])[1];
+  const want = a === 'orchestrator' ? 'primary' : 'subagent';
+  if (mode !== want) { bad(a + ': mode "' + mode + '" - expected "' + want + '"'); continue; }
+  if (!desc) { bad(a + ': empty or missing description'); continue; }
+  console.log('OK   ' + a.padEnd(19) + 'mode=' + mode);
+}
 
 // --- 4. commands point at real agents
 console.log('\n-- commands --');
@@ -118,40 +136,40 @@ for (const [k, v] of Object.entries({ model: cfg.model, small_model: cfg.small_m
 
 // --- 6. no validator shares a model family with any implementer
 console.log('\n-- cross-model validation --');
-const fam = m => {
-  if (m.startsWith('ollama/')) return 'local:' + m.split('/')[1].split(':')[0];
-  if (/^(moonshotai|kimi-for-coding)\//.test(m)) return 'kimi';
-  // openrouter is a BROKER, not a family. The vendor is the next path segment,
-  // so openrouter/minimax/... and openrouter/z-ai/... are genuinely different
-  // models and may validate each other.
-  if (m.startsWith('openrouter/')) return m.split('/')[1];
-  if (m.startsWith('opencode/')) {
-    const id = m.split('/')[1];
-    return (id.match(/^(big-pickle|minimax|nemotron|glm|kimi|deepseek|grok|ling|mimo|longcat)/) || [id])[0];
-  }
-  return m.split('/')[0];
-};
-const impl = ['local-quick', 'local-coder', 'local-reasoner', 'free-coder', 'free-thinker',
-  'free-analyst', 'doc-writer', 'coder', 'speed-coder', 'python-dev', 'dotnet-dev',
-  'deep-thinker', 'architect', 'cloud-architect'];
+// Shared with smoke-agents.cjs via scripts/lib/families.cjs - the family
+// names must match agents/orchestrator.md §8 exactly.
+const { family: fam } = require(path.join(__dirname, 'lib', 'families.cjs'));
+const impl = ['local-quick', 'local-coder', 'local-reasoner', 'free-coder', 'pickle-coder',
+  'free-thinker', 'free-analyst', 'doc-writer', 'coder', 'speed-coder', 'python-dev',
+  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder'];
 const vals = ['free-validator', 'local-validator', 'reviewer', 'validator', 'security-reviewer'];
 for (const a of [...impl, ...vals]) console.log('     ' + a.padEnd(19) + fam(pin(a)));
 for (const v of vals) for (const i of impl)
   if (fam(pin(v)) === fam(pin(i))) bad(v + ' shares family "' + fam(pin(v)) + '" with ' + i);
 console.log(fail ? '' : 'OK   no validator shares a family with any implementer');
 
-// --- 7. the ctx-estimate tier table must not drift from the agent pins
+// --- 7. the ctx-estimate tier table must cover every agent, name only real
+//        agents, and carry the exact pin and the catalog's context window
 console.log('\n-- ctx-estimate tier table --');
 {
-  const src = fs.readFileSync('scripts/ctx-estimate.cjs', 'utf8');
+  const src = fs.readFileSync(path.join(ROOT, 'scripts', 'ctx-estimate.cjs'), 'utf8');
   const table = src.slice(src.indexOf('const TIERS'), src.indexOf('];', src.indexOf('const TIERS')));
+  const listed = new Set();
   for (const [, agent, model, ctx] of table.matchAll(/\['([a-z-]+)', '([^']+)', (\d+)\]/g)) {
     if (!agents.has(agent)) { bad('ctx-estimate lists unknown agent: ' + agent); continue; }
+    listed.add(agent);
     const actual = pin(agent);
     if (model.includes('…')) { bad('ctx-estimate elides the model id for ' + agent + ' - store the exact id so this check can compare it'); continue; }
-    if (actual !== model) bad('ctx-estimate says ' + agent + ' = ' + model + ', agents/ says ' + actual);
+    if (actual !== model) { bad('ctx-estimate says ' + agent + ' = ' + model + ', agents/ says ' + actual); continue; }
+    // ollama windows come from the box, not models.dev - no catalog to check
+    const i = model.indexOf('/'), p = model.slice(0, i), id = model.slice(i + 1);
+    const e = p === 'ollama' ? null : md[p] && md[p].models[id];
+    if (e && Number(ctx) !== e.limit.context)
+      bad('ctx-estimate says ' + agent + ' ctx=' + ctx + ', models.dev says ' + e.limit.context);
     else console.log('OK   ' + agent.padEnd(16) + ctx.padStart(9) + '  ' + model);
   }
+  for (const a of [...agents].sort())
+    if (!listed.has(a)) bad('ctx-estimate has no TIERS entry for ' + a);
 }
 
 // --- 8. every agent named in a router fallback chain exists

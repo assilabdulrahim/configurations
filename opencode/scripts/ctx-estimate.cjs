@@ -25,13 +25,28 @@ const TIERS = [
   ['local-quick', 'ollama/qwen2.5-coder:7b', 32768],
   ['local-coder', 'ollama/qwen3:32b', 40960],
   ['local-validator', 'ollama/llama3.1:70b', 131072],
-  ['local-reasoner', 'ollama/gemma4:26b', 262144],
-  ['coder', 'kimi-for-coding/k3-256k', 262144],
   ['free-validator', 'ollama/llama3.1:70b', 131072],
-  ['free-coder', 'opencode/big-pickle', 204800],
-  ['free-thinker', 'opencode/nemotron-3-ultra-free', 1048576],
+  ['local-reasoner', 'ollama/gemma4:26b', 262144],
+  ['free-coder', 'opencode/big-pickle', 200000],
+  ['pickle-coder', 'opencode/big-pickle', 200000],
+  ['coder', 'kimi-for-coding/k3-256k', 262144],
+  ['python-dev', 'kimi-for-coding/k3-256k', 262144],
+  ['dotnet-dev', 'kimi-for-coding/k3-256k', 262144],
+  ['speed-coder', 'kimi-for-coding/kimi-for-coding-highspeed', 262144],
+  ['doc-writer', 'opencode/ling-3.0-flash-fin-free', 262144],
+  ['deep-thinker', 'kimi-for-coding/k3', 1048576],
+  ['architect', 'kimi-for-coding/k3', 1048576],
+  ['cloud-architect', 'kimi-for-coding/k3', 1048576],
+  ['wide-coder', 'kimi-for-coding/k3', 1048576],
+  ['free-thinker', 'opencode/nemotron-3-ultra-free', 1000000],
   ['free-analyst', 'opencode/muse-spark-1.2-contributor-free', 1048576],
   ['orchestrator', 'deepseek/deepseek-v4-pro', 1000000],
+  ['repo-analyst', 'deepseek/deepseek-v4-pro', 1000000],
+  ['reviewer', 'deepseek/deepseek-v4-pro', 1000000],
+  ['security-reviewer', 'deepseek/deepseek-v4-pro', 1000000],
+  ['tester', 'deepseek/deepseek-v4-flash', 1000000],
+  ['validator', 'google/gemini-3.1-pro-preview', 1048576],
+  ['glm-coder', 'openrouter/z-ai/glm-5.3-flash', 1310720],
 ];
 
 const SKIP_DIR = new Set(['node_modules', '.git', 'dist', 'build', 'out', 'bin', 'obj',
@@ -65,8 +80,16 @@ if (args.includes('--diff')) {
   // --relative: git reports paths from the repo root otherwise, which do not
   // resolve when this is run from a subdirectory.
   // ls-files --others: a new, untracked file is part of the change set too.
-  const names = [...git('git diff HEAD --name-only --relative'),
-    ...git('git ls-files --others --exclude-standard')];
+  let changed;
+  try {
+    changed = git('git diff HEAD --name-only --relative');
+  } catch {
+    // a repo with zero commits has no HEAD to diff against; the change set is
+    // the staged index plus whatever is still untracked. Degrade, don't die.
+    console.log('note: no HEAD yet - sizing staged + untracked files');
+    changed = git('git ls-files --cached');
+  }
+  const names = [...changed, ...git('git ls-files --others --exclude-standard')];
   files = [...new Set(names)].filter(f => fs.existsSync(f))
     .flatMap(f => fs.statSync(f).isDirectory() ? walk(f, []) : [{ path: f, bytes: fs.statSync(f).size }]);
 } else if (args.includes('--repo') || args.length === 0) {
@@ -92,7 +115,9 @@ console.log('tokens: ~' + tokens.toLocaleString() + '  (chars/' + CHARS_PER_TOKE
   ' x ' + OVERHEAD + ' overhead)');
 
 console.log('\n-- which tiers hold this --');
-for (const [agent, model, ctx] of TIERS.sort((a, b) => a[2] - b[2])) {
+// sort a copy: TIERS is module-level and reused below for the "smallest
+// comfortable tier" pick, so mutating it here would leak display order into logic
+for (const [agent, model, ctx] of [...TIERS].sort((a, b) => a[2] - b[2])) {
   const pct = Math.round((tokens / ctx) * 100);
   // under 60% is comfortable; 60-100% leaves no room for the reply or tool output
   const verdict = pct <= 60 ? 'FITS   ' : pct < 100 ? 'TIGHT  ' : 'TOO BIG';

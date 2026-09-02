@@ -31,7 +31,12 @@ if (process.argv.includes('--version')) {
     }).trim();
     console.log(sha);
   } catch (e) {
+    // Exit non-zero: a caller pinning a run to a config SHA must be able to
+    // tell "here is the SHA" from "there is no SHA" (no git, or a deployed
+    // copy that is not a checkout). Printing the error and exiting 0 reads
+    // as success to every caller that checks the status code.
     console.error(String((e && e.stderr) || (e && e.message) || e).trim());
+    process.exit(1);
   }
   process.exit(0);
 }

@@ -10,7 +10,8 @@
   //                    muse, ling) - the whole tier sits on the opencode
   //                    provider. Free, 200k-1M context, tool-capable.
   //   L2 SUBSCRIPTION  Kimi. Flat cost but FINITE QUOTA. The default tier.
-  //   L3 METERED       DeepSeek, Google. Per-token. Analysis + validation.
+  //   L3 METERED       DeepSeek, Google, OpenRouter. Per-token. Analysis +
+  //                    validation, and the provider-outage escape hatch.
   //
   // The rule the router follows (agents/orchestrator.md §2):
   //

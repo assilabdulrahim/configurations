@@ -9,7 +9,7 @@ opencode.jsonc          config: providers, commands, compaction, permissions
 AGENTS.md               rules every agent inherits: accuracy, coding standards, signals
 agents/  (25)           one file per agent; each is pinned to exactly one model
 skills/  (5)            reusable workflows with bundled reference material
-scripts/ (4)            what makes routing measured rather than guessed
+scripts/ (5)            what makes routing measured rather than guessed
 ```
 
 ---
@@ -57,6 +57,7 @@ one axis: the code never leaves the LAN.**
 | `ctx-estimate.cjs` | How many tokens a file set is, and which tiers hold it (`FITS` / `TIGHT` / `TOO BIG`) |
 | `verify-config.cjs` | Static correctness — run after any edit to config or agents |
 | `smoke-agents.cjs` | Calls every model for real and checks the router's design invariants |
+| `sync-check.cjs` | Whether the repo you edit still matches the config opencode actually loads |
 
 The router calls the first two at runtime. See [scripts/README.md](scripts/README.md),
 which documents each script's **honest limits** — they matter more than the

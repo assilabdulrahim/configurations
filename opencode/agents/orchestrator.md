@@ -18,9 +18,12 @@ permission:
     "git log *": allow
     # Absolute, because the router's cwd is the user's project, not the
     # config dir - a relative "scripts/..." only resolves when they coincide.
-    "node C:/Users/AssilAbdulrahim/.config/opencode/scripts/preflight.cjs*": allow
-    "node C:/Users/AssilAbdulrahim/.config/opencode/scripts/ctx-estimate.cjs*": allow
-    "node C:/Users/AssilAbdulrahim/.config/opencode/scripts/sync-check.cjs*": allow
+    # The profile segment is a wildcard so the rule is not pinned to one
+    # machine's username; the rest of the path stays anchored, so this still
+    # only ever authorises these three scripts inside an opencode config dir.
+    "node C:/Users/*/.config/opencode/scripts/preflight.cjs*": allow
+    "node C:/Users/*/.config/opencode/scripts/ctx-estimate.cjs*": allow
+    "node C:/Users/*/.config/opencode/scripts/sync-check.cjs*": allow
     "node scripts/preflight.cjs*": allow
     "node scripts/ctx-estimate.cjs*": allow
   webfetch: ask

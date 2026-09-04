@@ -50,8 +50,11 @@
   // It is metered per token, so it is gated: agents/orchestrator.md §7 names
   // the three conditions under which the router may reach it, and §5 keeps it
   // out of every fallback chain so nothing failing can spend on it by accident.
-  // Reachable directly with /prompt. Without `opencode auth login` -> anthropic
-  // that one agent is DEAD and nothing else is affected.
+  // Reachable directly with /prompt. Until the anthropic credential exists -
+  // added in the app's provider settings, or supplied as ANTHROPIC_API_KEY in
+  // the environment, or via `opencode auth login` if you use the CLI - that one
+  // agent is DEAD and nothing else is affected. preflight.cjs reports which of
+  // those sources is actually in play.
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",

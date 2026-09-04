@@ -181,6 +181,12 @@ async function head(url, headers, timeoutMs = 8000) {
 
   log('  -    kimi-for-coding subscription: no balance API. 429/402 at call time is the only signal.');
   log('  -    google          metered via Cloud billing; no balance API exposed here.');
+  // A workspace key (sk-ant-api...) can spend but cannot read spend: the usage
+  // and cost reports live behind a separate Admin key (sk-ant-admin...), which
+  // in turn cannot call the Messages API. So LIVE below means the key works,
+  // never that the account is funded - the two are genuinely different facts here.
+  log('  -    anthropic       metered; a workspace key exposes no balance. Spend is readable');
+  log('                       only with a separate sk-ant-admin key. LIVE != funded.');
 
   // ---- 3b. does each credential actually WORK? ------------------------
   // A key sitting in auth.json proves nothing: a revoked OpenRouter key is
@@ -204,6 +210,12 @@ async function head(url, headers, timeoutMs = 8000) {
     moonshotai: k => ['https://api.moonshot.ai/v1/models', { Authorization: 'Bearer ' + k }],
     google: k => ['https://generativelanguage.googleapis.com/v1beta/models?key=' +
       encodeURIComponent(k), {}],
+    // anthropic authenticates with x-api-key, NOT `Authorization: Bearer` like
+    // every other entry here - a Bearer header is simply ignored and the call
+    // comes back 401, which reads as a revoked key rather than a wrong header.
+    // anthropic-version is mandatory on every request, including this one.
+    anthropic: k => ['https://api.anthropic.com/v1/models',
+      { 'x-api-key': k, 'anthropic-version': '2023-06-01' }],
   };
 
   log('\n-- credential liveness --');

@@ -71,6 +71,10 @@ const ENDPOINT = {
   // models.dev lists minimax's base as .../anthropic/v1, but it also serves an
   // OpenAI-shaped /v1/chat/completions - verified 200 with a choices[] body.
   minimax: k => ['https://api.minimax.io/v1/chat/completions', { Authorization: 'Bearer ' + k }],
+  // anthropic serves the Messages API, not an OpenAI-shaped /chat/completions,
+  // and authenticates with x-api-key rather than a Bearer token. See SHAPES.
+  anthropic: k => ['https://api.anthropic.com/v1/messages',
+    { 'x-api-key': k, 'anthropic-version': '2023-06-01' }],
 };
 
 // Tier is per-MODEL, not per-provider: opencode (Zen) hosts both the free L1
@@ -110,6 +114,81 @@ const TOOL = [{
     },
   },
 }];
+
+// Two wire shapes live in this file. Every provider in ENDPOINT except anthropic
+// serves an OpenAI-shaped /chat/completions; anthropic serves the Messages API,
+// which differs in all five places these probes touch: the tool schema, the type
+// of tool_choice, where the reply text lives, how an image is attached, and the
+// fact that max_tokens is mandatory rather than optional.
+//
+// They are kept as two explicit shapes rather than one bent path because the
+// failure mode of getting it wrong is not an exception - it is a 200 with a
+// prose reply and no tool_call, which this script would report as `TOOLS FAIL`,
+// i.e. a capability verdict on a model that was never asked correctly.
+//
+// Without an anthropic shape the agent does not fail, it is `skipped` (see the
+// ENDPOINT lookup below) - a silent hole in the one script whose whole job is
+// measuring rather than trusting the catalog.
+const SHAPES = {
+  openai: {
+    toolChoices: ['auto', 'required'],
+    text: id => ({ model: id, max_tokens: 16,
+      messages: [{ role: 'user', content: 'Reply with exactly: ok' }] }),
+    tool: (id, choice) => ({ model: id, max_tokens: 128, tools: TOOL, tool_choice: choice,
+      messages: [{ role: 'user', content: 'What is the weather in Paris? Use the tool.' }] }),
+    vision: (id, src) => ({ model: id, max_tokens: 200,
+      messages: [{ role: 'user', content: [
+        { type: 'text', text: 'What colour fills this image?' },
+        { type: 'image_url', image_url: { url: src } },
+      ] }] }),
+    answered: j => !!(j && j.choices),
+    // deliberately stricter than answered(): the vision probe treats a 200 with
+    // an empty choices[] as a failure, which is what it did before SHAPES existed
+    replied: j => !!(j && j.choices && j.choices[0] && j.choices[0].message),
+    calledTool: j => {
+      const m = j && j.choices && j.choices[0] && j.choices[0].message;
+      return !!(m && m.tool_calls && m.tool_calls.length);
+    },
+    // some reasoning models put the answer in `reasoning` rather than `content`
+    said: j => {
+      const m = j && j.choices && j.choices[0] && j.choices[0].message;
+      return String((m && (m.content || m.reasoning)) || '');
+    },
+  },
+  anthropic: {
+    // 'any' is the Messages API spelling of 'required', and it is an object.
+    // A bare string here is a 400, not a fallback to auto.
+    toolChoices: [{ type: 'auto' }, { type: 'any' }],
+    text: id => ({ model: id, max_tokens: 16,
+      messages: [{ role: 'user', content: 'Reply with exactly: ok' }] }),
+    tool: (id, choice) => ({ model: id, max_tokens: 128, tool_choice: choice,
+      tools: TOOL.map(t => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters,
+      })),
+      messages: [{ role: 'user', content: 'What is the weather in Paris? Use the tool.' }] }),
+    vision: (id, src) => {
+      // A data: URL carries its own media type; a remote one is passed by
+      // reference. These are different source types here, not one field.
+      const b64 = src.match(/^data:([^;]+);base64,(.*)$/);
+      const source = b64
+        ? { type: 'base64', media_type: b64[1], data: b64[2] }
+        : { type: 'url', url: src };
+      return { model: id, max_tokens: 200,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: 'What colour fills this image?' },
+          { type: 'image', source },
+        ] }] };
+    },
+    answered: j => !!(j && Array.isArray(j.content)),
+    replied: j => !!(j && Array.isArray(j.content) && j.content.length),
+    calledTool: j => !!(j && Array.isArray(j.content) && j.content.some(b => b.type === 'tool_use')),
+    said: j => !j || !Array.isArray(j.content) ? ''
+      : j.content.filter(b => b.type === 'text').map(b => b.text).join(' '),
+  },
+};
+const shapeOf = prov => SHAPES[prov === 'anthropic' ? 'anthropic' : 'openai'];
 
 async function post(url, headers, body, timeoutMs) {
   const ac = new AbortController();
@@ -194,6 +273,7 @@ function chains() {
     const k = prov === 'ollama' ? 'ollama' : key(prov);
     if (!k) { results[name] = { skipped: 'provider not authenticated' }; continue; }
     const [url, headers] = mk(k);
+    const shape = shapeOf(prov);
     const tier = tierOf(model);
     if (tier === 'paid' && !PAID) { results[name] = { skipped: 'paid tier (pass --paid)' }; continue; }
 
@@ -202,31 +282,25 @@ function chains() {
     const timeout = tier === 'local' ? 300000 : 90000;
     const r = { tier, model };
 
-    const text = await post(url, headers, {
-      model: id, max_tokens: 16,
-      messages: [{ role: 'user', content: 'Reply with exactly: ok' }],
-    }, timeout);
-    r.text = { ok: text.status === 200 && !!(text.json && text.json.choices), status: text.status, ms: text.ms };
+    const text = await post(url, headers, shape.text(id), timeout);
+    r.text = { ok: text.status === 200 && shape.answered(text.json), status: text.status, ms: text.ms };
     if (!r.text.ok) r.text.error = errOf(text);
 
     if (r.text.ok) {
       // Tool choice is probabilistic: a model can answer in prose on one
       // attempt and emit the call on the next. One miss is not evidence that
       // it cannot call tools, so escalate tool_choice before believing a FAIL.
-      let tool = null, msg = null;
-      for (const choice of ['auto', 'required']) {
-        tool = await post(url, headers, {
-          model: id, max_tokens: 128, tools: TOOL, tool_choice: choice,
-          messages: [{ role: 'user', content: 'What is the weather in Paris? Use the tool.' }],
-        }, timeout);
-        msg = tool.json && tool.json.choices && tool.json.choices[0] && tool.json.choices[0].message;
-        if (msg && msg.tool_calls && msg.tool_calls.length) break;
+      let tool = null, called = false;
+      for (const choice of shape.toolChoices) {
+        tool = await post(url, headers, shape.tool(id, choice), timeout);
+        called = shape.calledTool(tool.json);
+        if (called) break;
       }
-      r.tools = { ok: !!(msg && msg.tool_calls && msg.tool_calls.length), status: tool.status, ms: tool.ms };
+      r.tools = { ok: called, status: tool.status, ms: tool.ms };
       // A 200 with prose instead of a call is a capability answer, not an
       // error - reporting the raw completion body as "the error" is noise.
       if (!r.tools.ok) r.tools.error = tool.status === 200
-        ? 'answered in prose, emitted no tool_call (even with tool_choice=required)'
+        ? 'answered in prose, emitted no tool_call (even with tool_choice forced)'
         : errOf(tool);
 
       // models.dev describes hosted models; it does not know what has been
@@ -248,19 +322,10 @@ function chains() {
           // 200 proves the image was accepted; naming the colour proves it was
           // actually looked at. Reasoning models need room to answer, and some
           // put the answer in `reasoning` rather than `content`.
-          const v = await post(url, headers, {
-            model: id, max_tokens: 200,
-            messages: [{
-              role: 'user', content: [
-                { type: 'text', text: 'What colour fills this image?' },
-                { type: 'image_url', image_url: { url: src } },
-              ],
-            }],
-          }, timeout);
-          const msg = v.json && v.json.choices && v.json.choices[0] && v.json.choices[0].message;
-          const said = String((msg && (msg.content || msg.reasoning)) || '');
+          const v = await post(url, headers, shape.vision(id, src), timeout);
+          const said = shape.said(v.json);
           return {
-            ok: v.status === 200 && !!msg,
+            ok: v.status === 200 && shape.replied(v.json),
             named: /red|crimson|scarlet|orange/i.test(said),
             status: v.status, err: errOf(v),
           };

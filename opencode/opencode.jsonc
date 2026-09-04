@@ -10,8 +10,9 @@
   //                    muse, ling) - the whole tier sits on the opencode
   //                    provider. Free, 200k-1M context, tool-capable.
   //   L2 SUBSCRIPTION  Kimi. Flat cost but FINITE QUOTA. The default tier.
-  //   L3 METERED       DeepSeek, Google, OpenRouter. Per-token. Analysis +
-  //                    validation, and the provider-outage escape hatch.
+  //   L3 METERED       DeepSeek, Google, OpenRouter, Anthropic. Per-token.
+  //                    Analysis + validation, the provider-outage escape hatch,
+  //                    and one reserved agent (see below).
   //
   // The rule the router follows (agents/orchestrator.md §2):
   //
@@ -42,6 +43,15 @@
   // opencode (Zen), deepseek, moonshotai, kimi-for-coding and anthropic are all
   // first-class in models.dev - they need `opencode auth login`, not a
   // provider block. Only the local box needs describing.
+  //
+  // anthropic is the newest of these and reaches exactly one agent,
+  // `prompt-smith` (anthropic/claude-sonnet-5), which writes the §10 briefs
+  // other agents run on and the agents/ and skills/ prompt files themselves.
+  // It is metered per token, so it is gated: agents/orchestrator.md §7 names
+  // the three conditions under which the router may reach it, and §5 keeps it
+  // out of every fallback chain so nothing failing can spend on it by accident.
+  // Reachable directly with /prompt. Without `opencode auth login` -> anthropic
+  // that one agent is DEAD and nothing else is affected.
   "provider": {
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
@@ -126,6 +136,11 @@
     "local": {
       "description": "Force this task onto the local Ollama box - nothing leaves the LAN",
       "agent": "local-coder",
+      "template": "$ARGUMENTS"
+    },
+    "prompt": {
+      "description": "Write the brief for a hop, or author/audit an agent or skill prompt",
+      "agent": "prompt-smith",
       "template": "$ARGUMENTS"
     }
   },

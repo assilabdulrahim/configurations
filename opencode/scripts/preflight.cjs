@@ -53,6 +53,14 @@ const JSON_OUT = process.argv.includes('--json');
 const OLLAMA = 'http://192.168.86.24:11434';
 const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json');
 
+// A provider can be authenticated by environment variable instead of auth.json -
+// models.dev declares one per provider, and the desktop app inherits the user's
+// environment the same way the CLI does. Without this, a key supplied that way
+// reads as PROVIDER NOT AUTHED and every agent on it is reported DEAD while in
+// fact working. That false negative is worse than no check at all: it sends you
+// re-authenticating a provider that was never broken.
+const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY' };
+
 // The router itself runs on deepseek/deepseek-v4-pro. That is a deliberate
 // choice - see agents/orchestrator.md - and it means DeepSeek hitting zero
 // stops EVERY request, not just the DeepSeek-tier ones. So warn early and
@@ -109,6 +117,10 @@ async function head(url, headers, timeoutMs = 8000) {
     log('WARN  no auth.json at ' + AUTH + ' - treating every cloud provider as unauthenticated');
   }
   for (const [id, v] of Object.entries(auth)) out.authed[id] = (v && v.type) || typeof v;
+  // Env vars are a second, equally valid source - report which one is in play so
+  // "authenticated" is never ambiguous about where the credential came from.
+  for (const [id, envVar] of Object.entries(ENV_KEYS))
+    if (!out.authed[id] && process.env[envVar]) out.authed[id] = 'env:' + envVar;
 
   log('-- authenticated providers --');
   for (const [id, t] of Object.entries(out.authed)) log('  OK   ' + id.padEnd(20) + t);
@@ -129,7 +141,8 @@ async function head(url, headers, timeoutMs = 8000) {
   log('\n-- credit --');
   const key = id => {
     const v = auth[id];
-    return v && (v.key || v.apiKey || v.access);
+    return (v && (v.key || v.apiKey || v.access)) ||
+      (ENV_KEYS[id] && process.env[ENV_KEYS[id]]) || undefined;
   };
 
   if (key('deepseek')) {
@@ -181,6 +194,12 @@ async function head(url, headers, timeoutMs = 8000) {
 
   log('  -    kimi-for-coding subscription: no balance API. 429/402 at call time is the only signal.');
   log('  -    google          metered via Cloud billing; no balance API exposed here.');
+  // A workspace key (sk-ant-api...) can spend but cannot read spend: the usage
+  // and cost reports live behind a separate Admin key (sk-ant-admin...), which
+  // in turn cannot call the Messages API. So LIVE below means the key works,
+  // never that the account is funded - the two are genuinely different facts here.
+  log('  -    anthropic       metered; a workspace key exposes no balance. Spend is readable');
+  log('                       only with a separate sk-ant-admin key. LIVE != funded.');
 
   // ---- 3b. does each credential actually WORK? ------------------------
   // A key sitting in auth.json proves nothing: a revoked OpenRouter key is
@@ -204,6 +223,12 @@ async function head(url, headers, timeoutMs = 8000) {
     moonshotai: k => ['https://api.moonshot.ai/v1/models', { Authorization: 'Bearer ' + k }],
     google: k => ['https://generativelanguage.googleapis.com/v1beta/models?key=' +
       encodeURIComponent(k), {}],
+    // anthropic authenticates with x-api-key, NOT `Authorization: Bearer` like
+    // every other entry here - a Bearer header is simply ignored and the call
+    // comes back 401, which reads as a revoked key rather than a wrong header.
+    // anthropic-version is mandatory on every request, including this one.
+    anthropic: k => ['https://api.anthropic.com/v1/models',
+      { 'x-api-key': k, 'anthropic-version': '2023-06-01' }],
   };
 
   log('\n-- credential liveness --');
@@ -229,7 +254,9 @@ async function head(url, headers, timeoutMs = 8000) {
     log('  ' + tag + ' ' + prov.padEnd(20) + state + (r.status ? ' (' + r.status + ')' : '') +
       (detail ? ' - ' + detail.slice(0, 70) : ''));
     if (state === 'REJECTED')
-      log('       every agent on this provider is unusable - re-auth: opencode auth login -> ' + prov);
+      log('       every agent on this provider is unusable - re-auth in the app' +
+        (ENV_KEYS[prov] ? ', or fix ' + ENV_KEYS[prov] : '') +
+        ', or: opencode auth login -> ' + prov);
   }
 
   // ---- 4. can each agent's provider actually be used? -----------------
@@ -248,7 +275,11 @@ async function head(url, headers, timeoutMs = 8000) {
       why = out.ollama ? (ok ? 'pulled' : 'NOT PULLED') : 'ollama unreachable';
     } else {
       const cred = out.credentials[prov];
-      if (!out.authed[prov]) { ok = false; why = 'PROVIDER NOT AUTHED - run: opencode auth login -> ' + prov; }
+      if (!out.authed[prov]) {
+        ok = false;
+        why = 'PROVIDER NOT AUTHED - add it in the app (Providers), or set ' +
+          (ENV_KEYS[prov] || 'its API key env var') + ', or: opencode auth login -> ' + prov;
+      }
       else if (cred && cred.state === 'REJECTED') { ok = false; why = 'CREDENTIAL REJECTED (' + cred.status + ') - re-auth: opencode auth login -> ' + prov; }
       else if (cred && cred.state === 'LIVE') { ok = true; why = 'credential verified live'; }
       else { ok = true; why = 'key present, NOT verified'; }

@@ -54,8 +54,13 @@ for (const a of [...agents].sort()) {
     if (!e) bad(a + ' -> ' + m + ' NOT IN models.dev');
     else if (!e.tool_call) bad(a + ' -> ' + m + ' HAS NO TOOL CALLING (cannot drive an agent)');
     else {
-      // models.dev reports cost 0 for subscription PLANS too, so classify by provider
-      const cls = p === 'opencode' ? 'FREE' : /^(kimi-for-coding|anthropic)$/.test(p) ? 'SUBSCRIPTION' : 'metered';
+      // models.dev reports cost 0 for subscription PLANS too, so classify by provider.
+      // anthropic is deliberately NOT in the subscription set: the credential this
+      // config uses is a workspace API key (sk-ant-api...), which bills per token.
+      // Labelling it SUBSCRIPTION would print a reassuring cost class contradicting
+      // agents/orchestrator.md §2, from the one script whose job is catching exactly
+      // that kind of self-contradiction.
+      const cls = p === 'opencode' ? 'FREE' : /^kimi-for-coding$/.test(p) ? 'SUBSCRIPTION' : 'metered';
       console.log('OK   ' + a.padEnd(19) + m.padEnd(46) + 'ctx=' + String(e.limit.context).padEnd(9) + cls);
     }
   }

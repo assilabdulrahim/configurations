@@ -1,0 +1,8 @@
+#!/bin/sh
+# Version-controlled so it exists on every clone. .git/hooks is not tracked,
+# which is why this lives here and is wired with:
+#   git config core.hooksPath .githooks
+#
+# Offline-safe by design - see opencode/scripts/gate.cjs for what runs and what
+# deliberately does not. Bypass a single commit with: git commit --no-verify
+exec node opencode/scripts/gate.cjs

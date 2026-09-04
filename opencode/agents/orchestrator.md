@@ -293,10 +293,12 @@ roughly 20%. That is exactly why the threshold is 60% and not 95%.
 |---|---|---|---|
 | **L0 local** | `ollama` | free, unlimited, **private** | context (32k–256k) |
 | **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
-| **L2 subscription** | `kimi-for-coding` | flat | quota |
-| **L3 metered** | `deepseek`, `google`, `openrouter`, `anthropic` | per token | account balance |
+| **L2 subscription** | `kimi-for-coding` | flat | quota — **BLOCKED, see §3** |
+| **L3 metered** | `deepseek`, `google`, `openrouter`, `anthropic`, `moonshotai` | per token | account balance |
 
-> **Quality first. Default to L2 (Kimi). Use L3 for analysis and validation.
+> **Quality first. Default to L2 (Kimi) when reachable — currently BLOCKED
+> (§3), so the agents that would use it run on L3 via `moonshotai` instead,
+> same model family, metered cost. Use L3 for analysis and validation.
 > Drop to L1 when L2/L3 quota or credit runs out. Use L0 for privacy,
 > compression and trivia.**
 
@@ -339,17 +341,40 @@ wasteful to buy.
 > the same chain — a second call to the same model on the same provider is a
 > wasted round trip, not a fallback.
 
-## L2 subscription — flat cost, finite quota. **The default tier.**
+## L2 subscription — BLOCKED. See below for what runs here now.
+
+`kimi-for-coding`'s key console (`kimi.com/code/console`) is inaccessible on
+this account — two keys generated at the wrong console (`platform.kimi.ai`,
+which issues Moonshot API keys, not Kimi Code keys) were both rejected
+`401 invalid_authentication_error` against `api.kimi.com/coding`, and the
+correct console then refused login outright. Nothing currently authenticates
+here, and it is not expected to resolve itself.
+
+The 8 agents below now run on **`moonshotai`, which is L3 metered, not
+flat** — real per-token spend against the `platform.kimi.ai` account balance,
+not a subscription quota. Same K3-family models, same context windows,
+different cost shape. `families.cjs` already groups `moonshotai` and
+`kimi-for-coding` into one family (`kimi`), so §8 cross-model validation and
+the reasoning below (`wide-coder` sharing a provider with `coder`) are both
+unaffected by the swap.
+
 | Agent | Model | Ctx | Role |
 |---|---|---|---|
-| `coder` | `kimi-for-coding/k3-256k` | 256k | **Default implementer** |
-| `python-dev` | `kimi-for-coding/k3-256k` | 256k | Python idiom, packaging |
-| `dotnet-dev` | `kimi-for-coding/k3-256k` | 256k | C#/.NET, EF, Blazor |
-| `speed-coder` | `kimi-for-coding/…-highspeed` | 256k | Mechanical bulk edits |
-| `wide-coder` | `kimi-for-coding/k3` | 1M | **The only 1M implementer** — tools + sight |
-| `deep-thinker` | `kimi-for-coding/k3` | 1M | **Default reasoning**, gap analysis (§4.6) |
-| `architect` | `kimi-for-coding/k3` | 1M | Software architecture, C4, ADRs |
-| `cloud-architect` | `kimi-for-coding/k3` | 1M | Cloud topology, IaC, DR, cost |
+| `coder` | `moonshotai/kimi-k2.7-code` | 256k | **Default implementer** |
+| `python-dev` | `moonshotai/kimi-k2.7-code` | 256k | Python idiom, packaging |
+| `dotnet-dev` | `moonshotai/kimi-k2.7-code` | 256k | C#/.NET, EF, Blazor |
+| `speed-coder` | `moonshotai/kimi-k2.7-code-highspeed` | 256k | Mechanical bulk edits |
+| `wide-coder` | `moonshotai/kimi-k3` | 1M | **The only 1M implementer** — tools + sight |
+| `deep-thinker` | `moonshotai/kimi-k3` | 1M | **Default reasoning**, gap analysis (§4.6) |
+| `architect` | `moonshotai/kimi-k3` | 1M | Software architecture, C4, ADRs |
+| `cloud-architect` | `moonshotai/kimi-k3` | 1M | Cloud topology, IaC, DR, cost |
+
+> The 256k pin is `kimi-k2.7-code`, not a renamed `k3-256k` — Moonshot's
+> public API has no identically-branded 256k K3 variant, so this is the
+> closest equivalent by context size, **a different model version**, not the
+> same model under a new name. If `kimi.com/code/console` ever becomes
+> reachable, re-pin these 8 agents back to `kimi-for-coding` and this section
+> reverts to flat-cost.
 
 ## L3 metered — costs real money per token. **Analysis and validation.**
 | Agent | Model | Ctx | Role |

@@ -1,7 +1,10 @@
 ---
 description: Mechanical high-volume edits - renames, import fixes, applying one known pattern across many files. Low judgment, high throughput.
 mode: subagent
-model: kimi-for-coding/kimi-for-coding-highspeed
+model: moonshotai/kimi-k2.7-code-highspeed
+# kimi-for-coding/kimi-for-coding-highspeed is unreachable - see
+# architect.md's comment for why. Name-matched substitute, not verified
+# identical in behaviour. Metered, not flat. See agents/orchestrator.md §2.
 temperature: 0
 permission:
   edit: allow

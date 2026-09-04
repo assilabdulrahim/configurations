@@ -71,6 +71,7 @@ const ENDPOINT = {
   // models.dev lists minimax's base as .../anthropic/v1, but it also serves an
   // OpenAI-shaped /v1/chat/completions - verified 200 with a choices[] body.
   minimax: k => ['https://api.minimax.io/v1/chat/completions', { Authorization: 'Bearer ' + k }],
+  moonshotai: k => ['https://api.moonshot.ai/v1/chat/completions', { Authorization: 'Bearer ' + k }],
   // anthropic serves the Messages API, not an OpenAI-shaped /chat/completions,
   // and authenticates with x-api-key rather than a Bearer token. See SHAPES.
   anthropic: k => ['https://api.anthropic.com/v1/messages',

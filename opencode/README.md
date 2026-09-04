@@ -37,8 +37,8 @@ returns through the one component that holds the session.
 |---|---|---|---|
 | **L0 local** | `ollama` (LAN box) | free, unlimited, **private** | context (32k–256k) |
 | **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
-| **L2 subscription** | `kimi-for-coding` | flat | quota |
-| **L3 metered** | `deepseek`, `google`, `openrouter`, `anthropic` | per token | account balance |
+| **L2 subscription** | `kimi-for-coding` | flat | quota — **currently BLOCKED, see orchestrator.md §3** |
+| **L3 metered** | `deepseek`, `google`, `openrouter`, `anthropic`, `moonshotai` | per token | account balance |
 
 > **Quality first. Default to L2 (Kimi). Use L3 for analysis and validation.
 > Drop to L1 when L2/L3 quota or credit runs out. Use L0 for privacy,

@@ -53,7 +53,12 @@ const log = (...a) => { if (!JSON_OUT && !QUIET) console.log(...a); };
 // editor state, fetched catalogs, the worktrees Claude Code owns - is either
 // not copied or is expected to differ, and listing it as drift would train
 // you to ignore this script's output.
-const TRACKED = ['agents', 'scripts', 'skills'];
+// 'plugins' is here because a plugin is the one kind of config that runs
+// automatically: if the repo copy and the deployed copy diverge, the router
+// silently behaves like the deployed one and nothing says so. That is the
+// exact drift this script exists to catch, and a directory it was never told
+// about is invisible to it.
+const TRACKED = ['agents', 'scripts', 'skills', 'plugins'];
 const TRACKED_FILES = ['opencode.jsonc', 'AGENTS.md', 'README.md'];
 const SKIP_DIR = new Set(['.git', '.claude', 'node_modules', '.opencode']);
 const SKIP_FILE = new Set(['models.json', 'tags.json', '.DS_Store']);

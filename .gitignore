@@ -4,3 +4,11 @@
 
 /.vs/*
 /opencode/.claude/worktrees/orchestrator-model-selection-1aa58a/.vs
+
+# Fetched catalogs used by verify-config / smoke-agents. Refreshed on demand,
+# never committed - they are a cache of models.dev and the ollama box, not config.
+opencode/models.json
+opencode/tags.json
+
+# Trace store, if ever pointed at the repo instead of ~/.config/opencode
+opencode/traces/

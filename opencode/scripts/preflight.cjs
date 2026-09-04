@@ -192,7 +192,14 @@ async function head(url, headers, timeoutMs = 8000) {
     } else log('  ?    openrouter      balance query returned ' + r.status);
   } else log('  -    openrouter      not authenticated');
 
-  log('  -    kimi-for-coding subscription: no balance API. 429/402 at call time is the only signal.');
+  // A real prepaid balance exists at platform.kimi.ai/console/account - confirmed
+  // live, $24.67 available. It is NOT reachable with the API key: four candidate
+  // REST paths under api.kimi.com all 404'd (checked 2026-09-04). The console is
+  // session/cookie-authenticated, a different mechanism this script cannot use
+  // without logging in, which it will not automate. So 429/402 at call time
+  // remains the only signal a SCRIPT gets - check the console by hand for the
+  // number itself.
+  log('  -    kimi-for-coding no API-reachable balance (checked); see console at platform.kimi.ai/console/account. 429/402 at call time is the only signal a script gets.');
   log('  -    google          metered via Cloud billing; no balance API exposed here.');
   // A workspace key (sk-ant-api...) can spend but cannot read spend: the usage
   // and cost reports live behind a separate Admin key (sk-ant-admin...), which
@@ -229,6 +236,11 @@ async function head(url, headers, timeoutMs = 8000) {
     // anthropic-version is mandatory on every request, including this one.
     anthropic: k => ['https://api.anthropic.com/v1/models',
       { 'x-api-key': k, 'anthropic-version': '2023-06-01' }],
+    // opencode (Zen) previously had no probe at all, despite hosting the ENTIRE
+    // L1 free tier - five agents ride on this one credential and preflight could
+    // not tell you if it was dead. Verified live: 200 with a models list.
+    opencode: k => ['https://opencode.ai/zen/v1/models', { Authorization: 'Bearer ' + k }],
+    minimax: k => ['https://api.minimax.io/v1/models', { Authorization: 'Bearer ' + k }],
   };
 
   log('\n-- credential liveness --');

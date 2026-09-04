@@ -1,7 +1,13 @@
 ---
 description: Software architecture - component decomposition, boundaries, data flow, trade-offs, C4 diagrams, ADRs. Invokes the `architecture` skill.
 mode: subagent
-model: kimi-for-coding/k3
+model: moonshotai/kimi-k3
+# kimi-for-coding/k3 is unreachable: that provider's key console
+# (kimi.com/code/console) is inaccessible on this account. moonshotai/kimi-k3
+# is the same K3 model, same 1M window, same family (families.cjs already
+# groups moonshotai and kimi-for-coding as "kimi") - reachable via the
+# platform.kimi.ai account, metered per token rather than flat. See
+# agents/orchestrator.md §2 and §3 for the full reasoning.
 temperature: 0.3
 permission:
   edit: ask          # design first, code second

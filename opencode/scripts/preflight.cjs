@@ -229,6 +229,11 @@ async function head(url, headers, timeoutMs = 8000) {
     // anthropic-version is mandatory on every request, including this one.
     anthropic: k => ['https://api.anthropic.com/v1/models',
       { 'x-api-key': k, 'anthropic-version': '2023-06-01' }],
+    // opencode (Zen) previously had no probe at all, despite hosting the ENTIRE
+    // L1 free tier - five agents ride on this one credential and preflight could
+    // not tell you if it was dead. Verified live: 200 with a models list.
+    opencode: k => ['https://opencode.ai/zen/v1/models', { Authorization: 'Bearer ' + k }],
+    minimax: k => ['https://api.minimax.io/v1/models', { Authorization: 'Bearer ' + k }],
   };
 
   log('\n-- credential liveness --');

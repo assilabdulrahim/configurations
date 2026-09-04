@@ -371,6 +371,11 @@ wasteful to buy.
 >
 > **`security-reviewer` shares a family with `reviewer`** (both deepseek). See
 > the pairing rule in §8 — it changes which validator a security change gets.
+>
+> **`prompt-smith` measured PASS on text, tools and vision at 1077ms.** That
+> figure is a 16-token probe reply, not a brief: it is time-to-first-token plus
+> setup, and says nothing about how long a real 20k-token brief takes. Treat the
+> one-extra-round-trip cost in §7 as still unmeasured until a brief is timed.
 
 ---
 
@@ -636,7 +641,7 @@ not assumed:
 | `speed-coder` | `kimi-for-coding/…-highspeed` | **yes** | measured live |
 | `validator` | `google/gemini-3.1-pro-preview` | **yes** | measured live |
 | `free-analyst` | `opencode/muse-spark-1.2-contributor-free` | **unverified** | catalog claims image; provider returned 500 |
-| `prompt-smith` | `anthropic/claude-sonnet-5` | **unverified** | catalog claims image; not yet probed live |
+| `prompt-smith` | `anthropic/claude-sonnet-5` | **yes** | measured live |
 | `free-coder` / `pickle-coder` | `opencode/big-pickle` | **no** | catalog: text only |
 | `doc-writer` | `opencode/ling-3.0-flash-fin-free` | **no** | catalog: text only |
 | `free-thinker` | `opencode/nemotron-3-ultra-free` | **no** | catalog: text only |

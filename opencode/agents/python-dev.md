@@ -1,11 +1,7 @@
 ---
 description: Python implementation - code, scripts, packaging, virtualenvs, type hints. Use for Python tasks.
 mode: subagent
-model: moonshotai/kimi-k2.7-code
-# kimi-for-coding/k3-256k is unreachable - see architect.md's comment for why.
-# kimi-k2.7-code is the closest public equivalent: same 256k window, but a
-# different underlying model version, not a renamed identical one. Metered,
-# not flat. See agents/orchestrator.md §2 and §3.
+model: kimi-for-coding/k3-256k
 temperature: 0.1
 permission:
   edit: allow

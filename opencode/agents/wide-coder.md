@@ -1,13 +1,7 @@
 ---
 description: Implementation that needs the whole picture - 1M context, tool-capable, and it can read images. Use when the change spans more files than coder's 256k window holds.
 mode: subagent
-model: moonshotai/kimi-k3
-# kimi-for-coding/k3 is unreachable: that provider's key console
-# (kimi.com/code/console) is inaccessible on this account. moonshotai/kimi-k3
-# is the same K3 model, same 1M window, same family (families.cjs already
-# groups moonshotai and kimi-for-coding as "kimi") - reachable via the
-# platform.kimi.ai account, metered per token rather than flat. See
-# agents/orchestrator.md §2 and §3 for the full reasoning.
+model: kimi-for-coding/k3
 temperature: 0.1
 permission:
   edit: allow

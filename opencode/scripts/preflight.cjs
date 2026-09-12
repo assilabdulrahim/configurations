@@ -61,7 +61,7 @@ const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json')
 // re-authenticating a provider that was never broken.
 const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY' };
 
-// The router itself runs on deepseek/deepseek-v4-pro. That is a deliberate
+// The router itself runs on deepseek/deepseek-flash. That is a deliberate
 // choice - see agents/orchestrator.md - and it means DeepSeek hitting zero
 // stops EVERY request, not just the DeepSeek-tier ones. So warn early and
 // loudly rather than at the moment it fails.
@@ -82,7 +82,7 @@ function reloadNotice(bal, cur, state) {
   log('  ' + '='.repeat(68));
   log('  ** ' + head);
   log('  ' + '='.repeat(68));
-  log('  The router itself runs on deepseek/deepseek-v4-pro. At zero it stops');
+  log('  The router itself runs on deepseek/deepseek-flash. At zero it stops');
   log('  and cannot re-route itself, so EVERY request fails - not only the');
   log('  ones that would have used DeepSeek.');
   log('');

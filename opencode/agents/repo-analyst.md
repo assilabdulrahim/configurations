@@ -1,7 +1,7 @@
 ---
 description: Whole-repo reading and tracing - the default analyst. "How does X work", cross-file investigation, audits. Read-only, 1M context.
 mode: subagent
-model: deepseek/deepseek-v4-pro
+model: deepseek/deepseek-flash
 temperature: 0.1
 permission:
   edit: deny

@@ -1,6 +1,6 @@
 ---
 description: Read-only reviewer for security and correctness - the default validator (pairs with kimi implementers). Use before merging.
-model: deepseek/deepseek-v4-pro
+model: deepseek/deepseek-flash
 mode: subagent
 temperature: 0
 permission:

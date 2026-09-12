@@ -27,7 +27,7 @@ Then it marks every agent `OK` or `DEAD`. The router must never route to a
 
 ### The reload warning
 
-The router itself runs on `deepseek/deepseek-v4-pro`, so DeepSeek hitting
+The router itself runs on `deepseek/deepseek-flash`, so DeepSeek hitting
 zero stops **every** request, not just DeepSeek-tier ones. Preflight warns
 early and loudly rather than at the moment it fails:
 

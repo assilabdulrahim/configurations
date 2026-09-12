@@ -1,4 +1,4 @@
-﻿################################################################################
+################################################################################
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
@@ -12,3 +12,9 @@ opencode/tags.json
 
 # Trace store, if ever pointed at the repo instead of ~/.config/opencode
 opencode/traces/
+
+# Environment files and credentials
+.env
+*.env.local
+*.local.env
+

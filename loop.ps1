@@ -196,9 +196,16 @@ function Invoke-Claude {
     if (-not $Prompt) { throw 'Invoke-Claude: supply -Command or -Prompt.' }
 
     $logFile = Join-Path $LogDir "$RunId-$Label.log"
-    Write-Note "-> claude -p [$Label] ($($Prompt.Length) chars)"
+    Write-Note "-> claude -p [$Label] ($($Prompt.Length) chars, via stdin)"
 
-    $output = & claude -p $Prompt `
+    # Piped via stdin rather than passed as a positional argument. PowerShell
+    # re-escapes arguments to native executables, and command bodies contain
+    # backticks (`git status`), $ substitutions and quotes that get mangled
+    # by that re-escaping - confirmed empirically 2026-07-30: the identical
+    # flags worked fine with a short plain-text prompt as an argument, but
+    # the 1364-char loop-status body produced no output at all. Stdin avoids
+    # PowerShell's argument parser entirely.
+    $output = $Prompt | & claude -p `
         --allowedTools $AllowedTools `
         --permission-mode acceptEdits 2>&1 | Out-String
 

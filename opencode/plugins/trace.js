@@ -34,6 +34,19 @@ import os from "os"
 import path from "path"
 
 const DIR = path.join(os.homedir(), ".config", "opencode", "traces")
+const AGENTS = path.join(os.homedir(), ".config", "opencode", "agents")
+
+// The model an agent is pinned to in agents/<name>.md, or null when there is no
+// such file (built-in agents) or no pin. Read per session, not cached, so an edit
+// to a pin is picked up without restarting opencode.
+const pinOf = (agent) => {
+  try {
+    const src = fs.readFileSync(path.join(AGENTS, agent + ".md"), "utf8")
+    return (src.match(/^model:\s*(\S+)/m) || [])[1] || null
+  } catch {
+    return null
+  }
+}
 
 // message.updated fires repeatedly while a response streams, and can fire again
 // after completion. The `time.completed` guard alone still yields duplicates, so
@@ -43,6 +56,7 @@ const SEEN_CAP = 5000
 
 export const TracePlugin = async ({ client }) => {
   const seen = new Set()
+  const pinChecked = new Set()
   let warned = false
 
   const warn = async (message, extra) => {
@@ -125,6 +139,46 @@ export const TracePlugin = async ({ client }) => {
                 }
               : null,
           })
+
+          // PIN DRIFT. The app's model picker can run an agent on a model other
+          // than its pin, for the whole session, and nothing says so. On
+          // 2026-09-13 the orchestrator ran 83 calls on gemini-3.1-pro-preview
+          // instead of deepseek-flash, burned Google's 250/day per-model cap
+          // together with validator, and died on 429 - the one agent with no
+          // automatic backup. Checked once per session+agent, on the first
+          // completed message, so the record lands before preflight reads it.
+          const key = m.sessionID + ":" + m.mode
+          if (m.mode && m.providerID && m.modelID && !pinChecked.has(key)) {
+            if (pinChecked.size > SEEN_CAP) pinChecked.clear()
+            pinChecked.add(key)
+            const pin = pinOf(m.mode)
+            const ran = m.providerID + "/" + m.modelID
+            if (pin && pin !== ran) {
+              await write({
+                kind: "pin-drift",
+                ts: new Date().toISOString(),
+                sessionID: m.sessionID,
+                agent: m.mode,
+                pinned: pin,
+                ran,
+              })
+              // Not routed through warn(): that one fires once per plugin
+              // lifetime, and a drift in a later session must still be reported.
+              try {
+                await client.app.log({
+                  body: {
+                    service: "trace",
+                    level: "warn",
+                    message: "agent " + m.mode + " is running on " + ran + ", not its pin " + pin +
+                      " - reset the model picker, or start a new session",
+                    extra: { sessionID: m.sessionID },
+                  },
+                })
+              } catch {
+                // the trace record above is the durable signal; the log is a courtesy
+              }
+            }
+          }
           return
         }
 

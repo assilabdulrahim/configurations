@@ -313,6 +313,61 @@ async function head(url, headers, timeoutMs = 8000) {
   log('\n' + (rows.length - dead.length) + '/' + rows.length + ' agents usable' +
     (dead.length ? '; ' + dead.length + ' unreachable: ' + dead.map(r => r[1]).join(', ') : ''));
 
+  // ---- 5. did an agent actually run on its pin? ----------------------------
+  // Everything above checks the CONFIG. The app's model picker can override an
+  // agent's model for a whole session, and the config never finds out. The trace
+  // plugin (plugins/trace.js) records what really ran, so read that back.
+  //
+  // HONEST LIMITS: traces are only as fresh as the last completed message, and
+  // the Google count is a rolling 24h over opencode's own records - Google's reset
+  // is midnight Pacific and counts calls from every client on the project, so it
+  // is a floor, not the real figure.
+  out.pinDrift = [];
+  out.googleDaily = {};
+  {
+    const TRACES = path.join(os.homedir(), '.config', 'opencode', 'traces');
+    const since = Date.now() - 24 * 60 * 60 * 1000;
+    const lines = [];
+    for (const back of [0, 1]) {
+      const day = new Date(Date.now() - back * 86400000).toISOString().slice(0, 10);
+      try { lines.push(...fs.readFileSync(path.join(TRACES, day + '.jsonl'), 'utf8').split(/\r?\n/)); }
+      catch { /* no trace file for that day */ }
+    }
+    const firstRun = new Map();
+    for (const l of lines) {
+      let r; try { r = JSON.parse(l); } catch { continue; }
+      if (!r || Date.parse(r.ts) < since) continue;
+      if (r.kind === 'msg' && r.providerID === 'google')
+        out.googleDaily[r.modelID] = (out.googleDaily[r.modelID] || 0) + 1;
+      // The plugin writes pin-drift lines; msg lines are re-checked too, so drift
+      // from before the plugin learned to record it is still reported.
+      if (r.kind !== 'msg' && r.kind !== 'pin-drift') continue;
+      const ran = r.ran || (r.providerID + '/' + r.modelID);
+      const k = r.sessionID + ':' + r.agent + ':' + ran;
+      if (!firstRun.has(k)) firstRun.set(k, { sessionID: r.sessionID, agent: r.agent, ran, ts: r.ts });
+    }
+    for (const v of firstRun.values()) {
+      const pin = out.agents[v.agent] && out.agents[v.agent].model;
+      if (pin && v.ran !== pin && !v.ran.includes('undefined')) out.pinDrift.push({ ...v, pinned: pin });
+    }
+
+    log('\n-- pin drift (last 24h of traces) --');
+    if (!out.pinDrift.length) log('  OK   every traced agent ran on its pinned model');
+    for (const d of out.pinDrift) {
+      log('  ' + (d.agent === 'orchestrator' ? 'WARN' : 'note') + ' ' + d.agent.padEnd(19) + 'ran ' + d.ran +
+        ', pinned ' + d.pinned + '  (session ' + String(d.sessionID).slice(0, 12) + ', from ' + d.ts + ')');
+    }
+    if (out.pinDrift.some(d => d.agent === 'orchestrator'))
+      log('       The router has no automatic backup. Reset the model picker to its pin, or start a new session.');
+
+    const GOOGLE_CAP = Number(process.env.GOOGLE_DAILY_CAP || 250);
+    for (const [model, n] of Object.entries(out.googleDaily)) {
+      const tag = n >= GOOGLE_CAP ? 'OVER' : n >= 0.8 * GOOGLE_CAP ? 'WARN' : 'OK  ';
+      log('  ' + tag + ' google/' + model.padEnd(28) + n + ' calls in 24h (cap ' + GOOGLE_CAP +
+        '/model/day)' + (tag === 'OK  ' ? '' : ' - route validation to validator-openrouter / validator-minimax'));
+    }
+  }
+
   if (JSON_OUT) console.log(JSON.stringify(out, null, 2));
   // exitCode rather than process.exit(): forcing exit while fetch keepalive
   // sockets are still open trips a libuv assertion on Windows.

@@ -44,9 +44,9 @@ configurations/
 │   └── .gitattributes                # Enforces LF line-endings for shell hooks
 │
 ├── 🔄 CLUSTER 2: Autonomous Claude Code Loop Harness
-│   ├── loop.ps1                      # Root PowerShell loop driver (older revision)
-│   ├── loop-harness-v0.1/            # Self-contained sub-harness (subrepo/submodule)
-│   │   ├── loop.ps1                  # Updated PowerShell driver (includes stdin piping fix)
+│   ├── loop.ps1                      # Root PowerShell loop driver (synchronized with stdin piping fix)
+│   ├── loop-harness-v0.1/            # Self-contained harness template & workflow suite (tracked natively)
+│   │   ├── loop.ps1                  # PowerShell loop driver (includes stdin piping fix)
 │   │   ├── run-loop.sh               # Bash loop driver for Linux/macOS/WSL
 │   │   ├── setup.ps1                 # Windows environment initializer
 │   │   ├── PIPELINE.md, WINDOWS.md   # Harness architecture & Windows-specific operational guide
@@ -86,7 +86,7 @@ configurations/
 | **`opencode/`** | **Internal ecosystem** | Node.js (for scripts), network access or local Ollama host | `.githooks/pre-commit` | ❌ Yes, but must update git hook path if moved. |
 | **`.githooks/pre-commit`** | **Dependent** | Requires `node` and `opencode/scripts/gate.cjs` | Invoked automatically by `git commit` | ❌ No, breaking this breaks normal commits unless `--no-verify` is used. |
 | **`.gitattributes`** | **Independent** | Git | `.githooks/*` | ⚠️ Keep at root to prevent CRLF line-ending corruption on shell scripts. |
-| **`loop-harness-v0.1/`** | **Fully Self-Contained** | `claude` CLI, PowerShell 7 / Bash, Git | None | ✅ Completely independent standalone harness suite. |
+| **`loop-harness-v0.1/`** | **Self-Contained Template** | `claude` CLI, PowerShell 7 / Bash, Git | None | ✅ Tracked natively as standard files (no nested `.git`). Safe to copy into new projects. |
 | **`loop.ps1` (root)** | **Synchronized** | `claude` CLI, `~/.claude` or `-HarnessRoot` | Writes to `.loop-logs/` | ✅ Upgraded to match `loop-harness-v0.1/loop.ps1` (with stdin piping). |
 | **`templates/` (root)** | **Independent** | None | Read by loop harness when starting new runs | ⚠️ Duplicate of `loop-harness-v0.1/templates/`. |
 | **`monitor.bat`** | **Partially Dependent** | Windows Terminal (`wt`), SSH client, remote host `192.168.86.24` | Requires `watch-mem.sh` to exist on the remote host | ✅ Independent locally; relies on LAN connectivity to Linux server. |
@@ -316,3 +316,5 @@ Completed cleanup operations performed:
 - [x] **Sanitize Docker Passwords**: Extracted passwords from `docker-compose.yml` into `.env` (ignored by Git) and created `.env.example` as a template.
 - [x] **Configure Git Hooks**: Activated the pre-commit hook via `git config core.hooksPath .githooks`.
 - [x] **Isolate Project Prompts**: Kept in `prompts/` as historical reference documents for `QuantumReadyDocs`.
+- [x] **Un-nest Sub-Repository**: Removed the embedded `.git` in `loop-harness-v0.1/` and converted all 29 files into directly tracked repository files, eliminating submodule sync issues and preventing corrupted nested repo copies.
+- [x] **Merge Feature Branches & Prune Worktrees**: Merged `claude/troubleshooting-0a0d68` (restoring Kimi-for-coding flat-tier pins), unlinked the `deepseek-v4-flash-migration-abb605` worktree, and deleted the merged local branches cleanly.

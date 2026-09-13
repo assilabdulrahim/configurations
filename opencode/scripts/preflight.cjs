@@ -59,7 +59,7 @@ const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json')
 // reads as PROVIDER NOT AUTHED and every agent on it is reported DEAD while in
 // fact working. That false negative is worse than no check at all: it sends you
 // re-authenticating a provider that was never broken.
-const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY' };
+const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY', 'zai-coding-plan': 'ZHIPU_API_KEY' };
 
 // The router itself runs on deepseek/deepseek-flash. That is a deliberate
 // choice - see agents/orchestrator.md - and it means DeepSeek hitting zero
@@ -201,6 +201,13 @@ async function head(url, headers, timeoutMs = 8000) {
   // number itself.
   log('  -    kimi-for-coding no API-reachable balance (checked); see console at platform.kimi.ai/console/account. 429/402 at call time is the only signal a script gets.');
   log('  -    google          metered via Cloud billing; no balance API exposed here.');
+  // LIVE below is not "has quota". Google caps requests PER MODEL PER DAY
+  // (generate_requests_per_model_per_day - 250 on gemini-3.1-pro at the tier this
+  // project is on). The key stays valid, the models list still answers 200, and
+  // only a generate call returns 429. That is why validator has two backups.
+  log('                       per-model DAILY request caps are invisible to this probe - a');
+  log('                       429 on one model leaves the key LIVE. Backups: orchestrator.md §5.');
+  log('  -    zai-coding-plan flat subscription; no balance API. 429 at call time is the only signal.');
   // A workspace key (sk-ant-api...) can spend but cannot read spend: the usage
   // and cost reports live behind a separate Admin key (sk-ant-admin...), which
   // in turn cannot call the Messages API. So LIVE below means the key works,
@@ -241,6 +248,9 @@ async function head(url, headers, timeoutMs = 8000) {
     // not tell you if it was dead. Verified live: 200 with a models list.
     opencode: k => ['https://opencode.ai/zen/v1/models', { Authorization: 'Bearer ' + k }],
     minimax: k => ['https://api.minimax.io/v1/models', { Authorization: 'Bearer ' + k }],
+    // Base URL from models.dev. The /models path is NOT yet verified against a
+    // live key - a 404 here reports UNREACHABLE (WARN), never DEAD.
+    'zai-coding-plan': k => ['https://api.z.ai/api/coding/paas/v4/models', { Authorization: 'Bearer ' + k }],
   };
 
   log('\n-- credential liveness --');

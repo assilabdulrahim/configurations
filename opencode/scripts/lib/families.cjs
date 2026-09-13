@@ -15,6 +15,9 @@
 function family(m) {
   if (m.startsWith('ollama/')) return 'local:' + m.split('/')[1].split(':')[0];
   if (/^(moonshotai|kimi-for-coding)\//.test(m)) return 'kimi';
+  // z.ai sells GLM under four provider ids (metered and coding plan, global and
+  // China). All of them are the same family as openrouter/z-ai/...
+  if (/^(zai|zai-coding-plan|zhipuai|zhipuai-coding-plan)\//.test(m)) return 'z-ai';
   if (m.startsWith('openrouter/')) return m.split('/')[1];
   if (m.startsWith('opencode/')) {
     const id = m.split('/')[1];

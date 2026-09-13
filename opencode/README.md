@@ -7,7 +7,7 @@ runs out of credit.
 ```
 opencode.jsonc          config: providers, commands, compaction, permissions
 AGENTS.md               rules every agent inherits: accuracy, coding standards, signals
-agents/  (26)           one file per agent; each is pinned to exactly one model
+agents/  (29)           one file per agent; each is pinned to exactly one model
 skills/  (5)            reusable workflows with bundled reference material
 scripts/ (7)            what makes routing measured rather than guessed
 plugins/ (1)            trace capture - the only thing here that runs by itself
@@ -37,8 +37,8 @@ returns through the one component that holds the session.
 |---|---|---|---|
 | **L0 local** | `ollama` (LAN box) | free, unlimited, **private** | context (32k–256k) |
 | **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
-| **L2 subscription** | `kimi-for-coding` | flat | quota — single provider |
-| **L3 metered** | `deepseek`, `google`, `openrouter`, `anthropic`, `moonshotai` | per token | account balance |
+| **L2 subscription** | `kimi-for-coding`, `zai-coding-plan` | flat | quota — two providers |
+| **L3 metered** | `deepseek`, `google`, `openrouter`, `minimax`, `anthropic`, `moonshotai` | per token | account balance |
 
 > **Quality first. Default to L2 (Kimi). Use L3 for analysis and validation.
 > Drop to L1 when L2/L3 quota or credit runs out. Use L0 for privacy,
@@ -91,12 +91,22 @@ where **every step is a different provider**:
 ```
 implement   coder ──▶ free-coder ──▶ glm-coder ──▶ local-coder
             (kimi)    (zen)          (openrouter)  (ollama)
-validate    reviewer ──▶ validator ──▶ local-validator
-            (deepseek)   (google)      (ollama)
+validate    reviewer ──▶ validator ──▶ validator-openrouter ──▶ validator-minimax ──▶ local-validator
+            (deepseek)   (google)      (openrouter)             (minimax)            (ollama)
 ```
 
 (The full set — reason, analyse, document, inspect, compress — is in
 `agents/orchestrator.md` §5.)
+
+**Every public-LLM agent has at least two backups**, each on a different
+provider from the primary and from each other (`orchestrator.md` §5 *Backups
+per agent*). `verify-config.cjs` fails the build when one is missing. This
+exists because `validator` once had none: Google's per-model daily cap
+(`generate_requests_per_model_per_day`, 250 on `gemini-3.1-pro`) returned 429
+while preflight still reported the key LIVE, and `/validate` called the agent
+directly, so the error reached the user raw. `/validate` now goes through the
+router. The only agent without a backup is the router itself — opencode cannot
+fail over the primary agent — so §5 carries two standby pins for it.
 
 Every switch is announced. Dead providers are recorded in the ledger so they
 are not retried all session.
@@ -239,6 +249,11 @@ Required: `deepseek`, `kimi-for-coding`, `opencode` (Zen), `google`, `openrouter
 Zen hosts the **entire L1 free tier**, so without it five agents are DEAD.
 `openrouter` hosts `glm-coder`, the metered provider-outage escape hatch —
 reachable when Zen is rate-limited or a paid provider runs out (orchestrator.md §5).
+
+Recommended: `minimax` (backs up `validator`) and **Z.AI Coding Plan**
+(`zai-coding-plan`, or `ZHIPU_API_KEY`) — the second flat-cost provider behind
+`zai-coder`, which backs up every Kimi implementer. Without it `zai-coder` is
+DEAD and the router skips to the next backup.
 
 Optional: `anthropic`, a workspace API key (`sk-ant-api…`). It reaches exactly one
 agent, `prompt-smith`. Without it that agent is DEAD and nothing else changes.

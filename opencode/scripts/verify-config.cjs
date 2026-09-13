@@ -146,8 +146,9 @@ console.log('\n-- cross-model validation --');
 const { family: fam } = require(path.join(__dirname, 'lib', 'families.cjs'));
 const impl = ['local-quick', 'local-coder', 'local-reasoner', 'free-coder', 'pickle-coder',
   'free-thinker', 'free-analyst', 'doc-writer', 'coder', 'speed-coder', 'python-dev',
-  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder'];
-const vals = ['free-validator', 'local-validator', 'reviewer', 'validator', 'security-reviewer'];
+  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder', 'moonshot-coder'];
+const vals = ['free-validator', 'local-validator', 'reviewer', 'validator', 'validator-openrouter',
+  'validator-minimax', 'security-reviewer'];
 for (const a of [...impl, ...vals]) console.log('     ' + a.padEnd(19) + fam(pin(a)));
 for (const v of vals) for (const i of impl)
   if (fam(pin(v)) === fam(pin(i))) bad(v + ' shares family "' + fam(pin(v)) + '" with ' + i);
@@ -186,6 +187,50 @@ console.log('\n-- fallback chains --');
     .filter(n => agents.has(n) || /^(free|local|pickle|deep|repo|doc|speed)-/.test(n)));
   for (const n of names) if (!agents.has(n)) bad('fallback chain names a missing agent: ' + n);
   console.log('OK   ' + names.size + ' agents referenced across the chains, all exist');
+}
+
+// --- 9. every public-LLM agent has at least two backups, each on a provider
+//        different from the primary and from each other. A backup on the same
+//        provider is not a backup: a 402/429 is usually account- or project-wide.
+//        Exempt: ollama (no quota to run out) and the orchestrator (it is the
+//        primary agent - opencode cannot fail it over; §5 lists standby pins).
+console.log('\n-- backups --');
+{
+  const start = orch.indexOf('## Backups per agent');
+  const rows = new Map();
+  if (start < 0) bad('agents/orchestrator.md: no "## Backups per agent" section');
+  else {
+    const end = orch.indexOf('\n## ', start + 1);
+    for (const line of orch.slice(start, end < 0 ? undefined : end).split(/\r?\n/)) {
+      const m = line.match(/^([a-z][a-z-]+)\s{2,}([a-z-]+(?:\s*,\s*[a-z-]+)+)\s*$/);
+      if (m) rows.set(m[1], m[2].split(',').map(s => s.trim()));
+    }
+  }
+  const prov = a => (pin(a) || '').split('/')[0];
+  const edits = a => /^\s{2}edit:\s*allow/m.test(fs.readFileSync(path.join(ROOT, 'agents', a + '.md'), 'utf8'));
+  const ctx = new Map([...fs.readFileSync(path.join(ROOT, 'scripts', 'ctx-estimate.cjs'), 'utf8')
+    .matchAll(/\['([a-z-]+)', '[^']+', (\d+)\]/g)].map(m => [m[1], Number(m[2])]));
+  for (const a of [...agents].sort()) {
+    if (a === 'orchestrator' || prov(a) === 'ollama') continue;
+    const b = rows.get(a);
+    if (!b) { bad(a + ': public-LLM agent with no row in "## Backups per agent"'); continue; }
+    const missing = b.filter(x => !agents.has(x));
+    if (missing.length) { bad(a + ': backup names a missing agent: ' + missing.join(', ')); continue; }
+    if (b.length < 2) { bad(a + ': needs at least two backups, has ' + b.length); continue; }
+    const seen = [prov(a)];
+    let ok = true;
+    for (const x of b) {
+      if (seen.includes(prov(x))) { bad(a + ': backup ' + x + ' is on provider "' + prov(x) + '" again - one outage takes both'); ok = false; }
+      seen.push(prov(x));
+      if (edits(a) && !edits(x)) { bad(a + ' edits files but backup ' + x + ' cannot'); ok = false; }
+      if (vals.includes(a) && !vals.includes(x)) { bad(a + ' is a validator but backup ' + x + ' is not - independence is unchecked'); ok = false; }
+      // 0.75, not 1: 1048576 -> 1000000 is rounding between vendors, and a WARN on
+      // every such row is how a check gets scrolled past. Warn on a real narrowing.
+      if (ctx.get(x) < 0.75 * ctx.get(a)) console.log('WARN ' + a + ' -> ' + x + ' narrows the window ' + ctx.get(a) + ' -> ' + ctx.get(x) + ' (re-run ctx-estimate before landing there)');
+    }
+    if (ok) console.log('OK   ' + a.padEnd(21) + b.map(x => x + ' (' + prov(x) + ')').join(', '));
+  }
+  for (const a of rows.keys()) if (!agents.has(a)) bad('"## Backups per agent" lists unknown agent: ' + a);
 }
 
 console.log('\n' + (fail ? fail + ' FAILURES' : 'ALL CHECKS PASSED'));

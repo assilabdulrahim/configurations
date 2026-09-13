@@ -133,8 +133,11 @@
     },
     "validate": {
       "description": "Cross-model validation of the current diff (never the model that wrote it)",
-      "agent": "validator",
-      "template": "Validate the uncommitted changes in this repo. Read .opencode/handoff.md first to see which model produced them. Report as path:line - problem - suggested fix, then a one-line verdict: PASS or CHANGES-REQUESTED."
+      // Routed through the orchestrator, NOT straight to `validator`. A command
+      // pinned to one agent bypasses §5 entirely, so a single 429 on Google's
+      // per-model daily cap used to surface raw to the user with no backup tried.
+      "agent": "orchestrator",
+      "template": "Validate the uncommitted changes in this repo. Read .opencode/handoff.md first to see which model produced them, pick a validator from a different family (§8), and on any 402/429/5xx walk that validator's backups (§5 Backups per agent) - announce each switch. Report as path:line - problem - suggested fix, then a one-line verdict: PASS or CHANGES-REQUESTED, naming the validator that actually ran."
     },
     "local": {
       "description": "Force this task onto the local Ollama box - nothing leaves the LAN",

@@ -71,8 +71,7 @@ const ENDPOINT = {
   // models.dev lists minimax's base as .../anthropic/v1, but it also serves an
   // OpenAI-shaped /v1/chat/completions - verified 200 with a choices[] body.
   minimax: k => ['https://api.minimax.io/v1/chat/completions', { Authorization: 'Bearer ' + k }],
-  moonshotai: k => ['https://api.moonshot.ai/v1/chat/completions', { Authorization: 'Bearer ' + k }],
-  // anthropic serves the Messages API, not an OpenAI-shaped /chat/completions,
+  moonshotai: k => ['https://api.moonshot.ai/v1/chat/completions', { Authorization: 'Bearer ' + k }],  // anthropic serves the Messages API, not an OpenAI-shaped /chat/completions,
   // and authenticates with x-api-key rather than a Bearer token. See SHAPES.
   anthropic: k => ['https://api.anthropic.com/v1/messages',
     { 'x-api-key': k, 'anthropic-version': '2023-06-01' }],
@@ -135,9 +134,13 @@ const SHAPES = {
     toolChoices: ['auto', 'required'],
     text: id => ({ model: id, max_tokens: 16,
       messages: [{ role: 'user', content: 'Reply with exactly: ok' }] }),
-    tool: (id, choice) => ({ model: id, max_tokens: 128, tools: TOOL, tool_choice: choice,
+    // 1024, not 128: a reasoning model spends its budget thinking first. Measured on
+    // openrouter/google/gemini-3.1-pro-preview - 125 of 128 tokens went to reasoning,
+    // finish_reason "length", no tool_call, reported as TOOLS FAIL. At 2048 the same
+    // prompt emitted the call. The cap was manufacturing a capability verdict.
+    tool: (id, choice) => ({ model: id, max_tokens: 1024, tools: TOOL, tool_choice: choice,
       messages: [{ role: 'user', content: 'What is the weather in Paris? Use the tool.' }] }),
-    vision: (id, src) => ({ model: id, max_tokens: 200,
+    vision: (id, src) => ({ model: id, max_tokens: 1024,
       messages: [{ role: 'user', content: [
         { type: 'text', text: 'What colour fills this image?' },
         { type: 'image_url', image_url: { url: src } },
@@ -395,10 +398,13 @@ function chains() {
 
   log('\n-- invariant 2: cross-model validation is achievable --');
   {
-    const impl = ['free-coder', 'coder', 'pickle-coder', 'local-coder'].filter(canEdit);
-    const vals = ['free-validator', 'reviewer', 'validator', 'local-validator'].filter(live);
-    const implTested = ['free-coder', 'coder', 'pickle-coder', 'local-coder'].some(tested);
-    const valsTested = ['free-validator', 'reviewer', 'validator', 'local-validator'].some(tested);
+    const IMPL = ['free-coder', 'coder', 'pickle-coder', 'local-coder', 'glm-coder', 'moonshot-coder'];
+    const VALS = ['free-validator', 'reviewer', 'validator', 'validator-openrouter',
+      'validator-minimax', 'local-validator'];
+    const impl = IMPL.filter(canEdit);
+    const vals = VALS.filter(live);
+    const implTested = IMPL.some(tested);
+    const valsTested = VALS.some(tested);
     if (!implTested || !valsTested) log('  ?    not enough of the roster tested to judge (run without --agent)');
     else if (!impl.length) bad('no live implementer that can call tools - nothing can edit a file');
     else if (!vals.length) bad('no live validator - work would ship unvalidated');

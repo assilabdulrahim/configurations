@@ -164,6 +164,8 @@ async function head(url, headers, timeoutMs = 8000) {
     } else log('  ?    deepseek        balance query returned ' + r.status);
   } else log('  -    deepseek        not authenticated');
 
+  // moonshotai carries moonshot-coder, the metered backup for every Kimi
+  // subscription agent - so a low balance here means that backup is at risk.
   if (key('moonshotai')) {
     const r = await head('https://api.moonshot.ai/v1/users/me/balance',
       { Authorization: 'Bearer ' + key('moonshotai') });
@@ -201,7 +203,12 @@ async function head(url, headers, timeoutMs = 8000) {
   // number itself.
   log('  -    kimi-for-coding no API-reachable balance (checked); see console at platform.kimi.ai/console/account. 429/402 at call time is the only signal a script gets.');
   log('  -    google          metered via Cloud billing; no balance API exposed here.');
-  // A workspace key (sk-ant-api...) can spend but cannot read spend: the usage
+  // LIVE below is not "has quota". Google caps requests PER MODEL PER DAY
+  // (generate_requests_per_model_per_day - 250 on gemini-3.1-pro at the tier this
+  // project is on). The key stays valid, the models list still answers 200, and
+  // only a generate call returns 429. That is why validator has two backups.
+  log('                       per-model DAILY request caps are invisible to this probe - a');
+  log('                       429 on one model leaves the key LIVE. Backups: orchestrator.md §5.');  // A workspace key (sk-ant-api...) can spend but cannot read spend: the usage
   // and cost reports live behind a separate Admin key (sk-ant-admin...), which
   // in turn cannot call the Messages API. So LIVE below means the key works,
   // never that the account is funded - the two are genuinely different facts here.
@@ -240,8 +247,7 @@ async function head(url, headers, timeoutMs = 8000) {
     // L1 free tier - five agents ride on this one credential and preflight could
     // not tell you if it was dead. Verified live: 200 with a models list.
     opencode: k => ['https://opencode.ai/zen/v1/models', { Authorization: 'Bearer ' + k }],
-    minimax: k => ['https://api.minimax.io/v1/models', { Authorization: 'Bearer ' + k }],
-  };
+    minimax: k => ['https://api.minimax.io/v1/models', { Authorization: 'Bearer ' + k }],  };
 
   log('\n-- credential liveness --');
   for (const prov of Object.keys(out.authed)) {

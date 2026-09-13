@@ -14,8 +14,7 @@
 // models and may validate each other.
 function family(m) {
   if (m.startsWith('ollama/')) return 'local:' + m.split('/')[1].split(':')[0];
-  if (/^(moonshotai|kimi-for-coding)\//.test(m)) return 'kimi';
-  if (m.startsWith('openrouter/')) return m.split('/')[1];
+  if (/^(moonshotai|kimi-for-coding)\//.test(m)) return 'kimi';  if (m.startsWith('openrouter/')) return m.split('/')[1];
   if (m.startsWith('opencode/')) {
     const id = m.split('/')[1];
     if (id === 'big-pickle') return 'pickle';

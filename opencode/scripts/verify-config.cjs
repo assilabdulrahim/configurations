@@ -60,7 +60,7 @@ for (const a of [...agents].sort()) {
       // Labelling it SUBSCRIPTION would print a reassuring cost class contradicting
       // agents/orchestrator.md §2, from the one script whose job is catching exactly
       // that kind of self-contradiction.
-      const cls = p === 'opencode' ? 'FREE' : /^(kimi-for-coding|zai-coding-plan)$/.test(p) ? 'SUBSCRIPTION' : 'metered';
+      const cls = p === 'opencode' ? 'FREE' : /^kimi-for-coding$/.test(p) ? 'SUBSCRIPTION' : 'metered';
       console.log('OK   ' + a.padEnd(19) + m.padEnd(46) + 'ctx=' + String(e.limit.context).padEnd(9) + cls);
     }
   }
@@ -146,7 +146,7 @@ console.log('\n-- cross-model validation --');
 const { family: fam } = require(path.join(__dirname, 'lib', 'families.cjs'));
 const impl = ['local-quick', 'local-coder', 'local-reasoner', 'free-coder', 'pickle-coder',
   'free-thinker', 'free-analyst', 'doc-writer', 'coder', 'speed-coder', 'python-dev',
-  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder', 'zai-coder'];
+  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder', 'moonshot-coder'];
 const vals = ['free-validator', 'local-validator', 'reviewer', 'validator', 'validator-openrouter',
   'validator-minimax', 'security-reviewer'];
 for (const a of [...impl, ...vals]) console.log('     ' + a.padEnd(19) + fam(pin(a)));

@@ -104,7 +104,7 @@ permission:
     "coder": allow
     "wide-coder": allow
     "glm-coder": allow
-    "zai-coder": allow
+    "moonshot-coder": allow
     "speed-coder": allow
     "python-dev": allow
     "dotnet-dev": allow
@@ -296,7 +296,7 @@ roughly 20%. That is exactly why the threshold is 60% and not 95%.
 |---|---|---|---|
 | **L0 local** | `ollama` | free, unlimited, **private** | context (32k–256k) |
 | **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
-| **L2 subscription** | `kimi-for-coding`, `zai-coding-plan` | flat | quota — two providers |
+| **L2 subscription** | `kimi-for-coding` | flat | quota — single provider |
 | **L3 metered** | `deepseek`, `google`, `openrouter`, `minimax`, `anthropic`, `moonshotai` | per token | account balance |
 
 > **Quality first. Default to L2 (Kimi). Use L3 for analysis and
@@ -354,11 +354,6 @@ wasteful to buy.
 | `deep-thinker` | `kimi-for-coding/k3` | 1M | **Default reasoning**, gap analysis (§4.6) |
 | `architect` | `kimi-for-coding/k3` | 1M | Software architecture, C4, ADRs |
 | `cloud-architect` | `kimi-for-coding/k3` | 1M | Cloud topology, IaC, DR, cost |
-| `zai-coder` | `zai-coding-plan/glm-5.3` | 1M | **Kimi's backup** — second flat-cost provider, text only |
-
-> `zai-coder` is DEAD until the z.ai GLM Coding Plan credential exists
-> (`opencode auth login` → *Z.AI Coding Plan*, or `ZHIPU_API_KEY`). Nothing
-> else depends on it: every chain it sits in has another live step after it.
 
 > `kimi-for-coding` was blocked for a stretch — a key generated at the wrong
 > console (`platform.kimi.ai`, which issues Moonshot API keys, not Kimi Code
@@ -379,6 +374,7 @@ wasteful to buy.
 | `validator-openrouter` | `openrouter/google/gemini-3.1-pro-preview` | 1M | **Backup** — same model, OpenRouter billing and quota |
 | `validator-minimax` | `minimax/MiniMax-M3` | 1M | **Backup** — different vendor and provider, family `minimax` |
 | `security-reviewer` | `deepseek/deepseek-flash` | 1M | Threat model, security review |
+| `moonshot-coder` | `moonshotai/kimi-k3` | 1M | **Kimi's backup** — same K3 model, Moonshot pay-as-you-go balance |
 | `glm-coder` | `openrouter/z-ai/glm-5.3-flash` | **1.31M** | **Provider-outage escape hatch** — tools + sight |
 | `prompt-smith` | `anthropic/claude-sonnet-5` | 1M | **Writes briefs and prompt files — reserved, see the gate in §7** |
 
@@ -414,12 +410,12 @@ ladder**, never sideways.
 1M    free-thinker / free-analyst / deep-thinker / architect /
       cloud-architect / repo-analyst / tester / reviewer / validator /
       validator-openrouter / validator-minimax / security-reviewer /
-      wide-coder / zai-coder / prompt-smith
+      wide-coder / moonshot-coder / prompt-smith
 1.31M glm-coder                       <- the top of the ladder
 ```
 
 Three agents at the top can **edit**: `wide-coder` (kimi, subscription),
-`zai-coder` (z.ai, subscription) and `glm-coder` (openrouter, metered). Everything else up there reasons, reads or
+`moonshot-coder` (moonshot, metered) and `glm-coder` (openrouter, metered). Everything else up there reasons, reads or
 reviews. Prefer `wide-coder` — it is already paid for. Reach for `glm-coder`
 when Kimi quota is gone, or when the job genuinely exceeds 1M.
 
@@ -559,8 +555,8 @@ somewhere to go. Walk left to right, skipping anything preflight marked dead.
 Quality leads; cost is the fallback direction.
 
 ```
-implement   coder ──▶ zai-coder ──▶ free-coder ──▶ glm-coder ──▶ local-coder
-            (kimi)    (z.ai)        (zen)          (openrouter)  (ollama)
+implement   coder ──▶ moonshot-coder ──▶ free-coder ──▶ glm-coder ──▶ local-coder
+            (kimi)    (moonshot)         (zen)          (openrouter)  (ollama)
 
 reason      deep-thinker ──▶ repo-analyst ──▶ free-thinker ──▶ local-reasoner
             (kimi)           (deepseek)       (zen)            (ollama)
@@ -651,13 +647,13 @@ validator a backup outside the validator set.
 architect              repo-analyst, free-thinker
 cloud-architect        repo-analyst, free-thinker
 deep-thinker           repo-analyst, free-thinker
-coder                  zai-coder, free-coder, glm-coder
-python-dev             zai-coder, free-coder, glm-coder
-dotnet-dev             zai-coder, free-coder, glm-coder
-speed-coder            zai-coder, free-coder, glm-coder
-wide-coder             zai-coder, glm-coder
-zai-coder              wide-coder, glm-coder
-glm-coder              zai-coder, wide-coder
+coder                  moonshot-coder, free-coder, glm-coder
+python-dev             moonshot-coder, free-coder, glm-coder
+dotnet-dev             moonshot-coder, free-coder, glm-coder
+speed-coder            moonshot-coder, free-coder, glm-coder
+wide-coder             moonshot-coder, glm-coder
+moonshot-coder         wide-coder, glm-coder
+glm-coder              moonshot-coder, wide-coder
 free-coder             glm-coder, local-coder
 pickle-coder           glm-coder, local-coder
 doc-writer             glm-coder, local-reasoner
@@ -719,7 +715,7 @@ not assumed:
 | `validator` | `google/gemini-3.1-pro-preview` | **yes** | measured live |
 | `validator-openrouter` | `openrouter/google/gemini-3.1-pro-preview` | **yes** | measured live (2231ms, text + tools + vision) |
 | `validator-minimax` | `minimax/MiniMax-M3` | **yes** | measured live (456ms, text + tools + vision) |
-| `zai-coder` | `zai-coding-plan/glm-5.3` | **no** | catalog: text only |
+| `moonshot-coder` | `moonshotai/kimi-k3` | **yes** | measured live (2292ms, text + tools + vision) |
 | **you**, `reviewer`, `tester`, `security-reviewer` | `deepseek/deepseek-flash` | **yes** | measured live — new since the `deepseek-v4-pro` → `deepseek-flash` migration |
 | `prompt-smith` | `anthropic/claude-sonnet-5` | **yes** | measured live |
 | `free-analyst` | `opencode/muse-spark-1.2-contributor-free` | **unverified** | catalog claims image; provider returned 500 |
@@ -978,8 +974,8 @@ OpenRouter models from different vendors may legitimately validate each other.
 
 | Implementer | Validator |
 |---|---|
-| `coder` / `wide-coder` / `deep-thinker` / `architect` (kimi) | `reviewer` (deepseek) — the default pairing |
-| `glm-coder` / `zai-coder` (z-ai) | `reviewer` (deepseek) |
+| `coder` / `wide-coder` / `moonshot-coder` / `deep-thinker` / `architect` (kimi) | `reviewer` (deepseek) — the default pairing |
+| `glm-coder` (z-ai) | `reviewer` (deepseek) |
 | `repo-analyst` / `tester` / `security-reviewer` (deepseek) | `validator` (google) |
 | `free-coder` (pickle) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |
 | `doc-writer` (ling) | `reviewer` (deepseek); `local-validator` (llama) if budget-bound |

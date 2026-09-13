@@ -37,7 +37,7 @@ returns through the one component that holds the session.
 |---|---|---|---|
 | **L0 local** | `ollama` (LAN box) | free, unlimited, **private** | context (32k–256k) |
 | **L1 free** | `opencode` (Zen) | free | rate limits, single provider |
-| **L2 subscription** | `kimi-for-coding`, `zai-coding-plan` | flat | quota — two providers |
+| **L2 subscription** | `kimi-for-coding` | flat | quota — single provider |
 | **L3 metered** | `deepseek`, `google`, `openrouter`, `minimax`, `anthropic`, `moonshotai` | per token | account balance |
 
 > **Quality first. Default to L2 (Kimi). Use L3 for analysis and validation.
@@ -250,10 +250,11 @@ Zen hosts the **entire L1 free tier**, so without it five agents are DEAD.
 `openrouter` hosts `glm-coder`, the metered provider-outage escape hatch —
 reachable when Zen is rate-limited or a paid provider runs out (orchestrator.md §5).
 
-Recommended: `minimax` (backs up `validator`) and **Z.AI Coding Plan**
-(`zai-coding-plan`, or `ZHIPU_API_KEY`) — the second flat-cost provider behind
-`zai-coder`, which backs up every Kimi implementer. Without it `zai-coder` is
-DEAD and the router skips to the next backup.
+Recommended: `minimax` (backs up `validator`) and `moonshotai` — the Moonshot
+pay-as-you-go API behind `moonshot-coder`, which runs the same Kimi K3 as the
+subscription agents on a separate prepaid balance and backs up every Kimi
+implementer. Keep that balance at $10 or more: below it Moonshot applies a
+daily token cap. Without either key the router skips to the next backup.
 
 Optional: `anthropic`, a workspace API key (`sk-ant-api…`). It reaches exactly one
 agent, `prompt-smith`. Without it that agent is DEAD and nothing else changes.

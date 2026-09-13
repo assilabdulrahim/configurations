@@ -48,7 +48,7 @@ const TIERS = [
   ['validator', 'google/gemini-3.1-pro-preview', 1048576],
   ['validator-openrouter', 'openrouter/google/gemini-3.1-pro-preview', 1048576],
   ['validator-minimax', 'minimax/MiniMax-M3', 1048576],
-  ['zai-coder', 'zai-coding-plan/glm-5.3', 1000000],
+  ['moonshot-coder', 'moonshotai/kimi-k3', 1048576],
   ['prompt-smith', 'anthropic/claude-sonnet-5', 1000000],
   ['glm-coder', 'openrouter/z-ai/glm-5.3-flash', 1310720],
 ];

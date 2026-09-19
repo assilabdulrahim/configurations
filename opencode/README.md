@@ -7,9 +7,9 @@ runs out of credit.
 ```
 opencode.jsonc          config: providers, commands, compaction, permissions
 AGENTS.md               rules every agent inherits: accuracy, coding standards, signals
-agents/  (29)           one file per agent; each is pinned to exactly one model
+agents/  (30)           one file per agent; each is pinned to exactly one model
 skills/  (5)            reusable workflows with bundled reference material
-scripts/ (7)            what makes routing measured rather than guessed
+scripts/ (8)            what makes routing measured rather than guessed
 plugins/ (1)            trace capture - the only thing here that runs by itself
 ```
 
@@ -60,6 +60,7 @@ one axis: the code never leaves the LAN.**
 | `smoke-agents.cjs` | Calls every model for real and checks the router's design invariants |
 | `sync-check.cjs` | Whether the repo you edit still matches the config opencode actually loads |
 | `trace-report.cjs` | What was actually spent, how slow each agent is, whether a prompt cache exists |
+| `router-model.cjs` | Pins the router to K3 when the Kimi quota is live, DeepSeek Flash when it is not (`auto`) |
 | `gate.cjs` | The pre-commit gate - runs the checks above that are free and offline-safe |
 
 The router calls the first two at runtime. See [scripts/README.md](scripts/README.md),
@@ -256,8 +257,9 @@ subscription agents on a separate prepaid balance and backs up every Kimi
 implementer. Keep that balance at $10 or more: below it Moonshot applies a
 daily token cap. Without either key the router skips to the next backup.
 
-Optional: `anthropic`, a workspace API key (`sk-ant-api…`). It reaches exactly one
-agent, `prompt-smith`. Without it that agent is DEAD and nothing else changes.
+Optional: `anthropic`, a workspace API key (`sk-ant-api…`). It reaches two gated
+agents, `prompt-smith` (Sonnet 5) and `opus-coder` (Opus 5, at most two hops per
+session without asking). Without it both are DEAD and nothing else changes.
 
 Then verify:
 
@@ -278,6 +280,31 @@ node scripts/preflight.cjs
 | `/free`, `/local` | Force a tier |
 | `/prompt` | Write the brief for a hop, or author/audit an agent or skill prompt |
 | `/validate` | Cross-model check of the current diff |
+| `/opus` | Send a task straight to `opus-coder` (Claude Opus 5, metered) |
+| `/router` | Re-pin the router - K3 if the Kimi quota is live, DeepSeek if not. Runs on the local box, so it works when both are down |
+
+## Deploying
+
+A deploy is a copy of this directory to `~/.config/opencode`. The repo pins the
+router to K3; if the Kimi quota is out when you deploy, that copy puts the
+router on a dead provider and **every** request fails. So always finish with
+`router-model.cjs auto`:
+
+```powershell
+$dst = "$env:USERPROFILE.configopencode"
+foreach ($p in 'agents','scripts','skills','plugins','opencode.jsonc','AGENTS.md','README.md') {
+  Copy-Item -Recurse -Force (Join-Path opencode $p) $dst
+}
+node "$dstscriptsouter-model.cjs" auto
+node opencodescriptssync-check.cjs
+```
+
+Restart opencode afterwards: a running session keeps the config and router
+model it started with.
+
+Keep the router on K3 whenever the quota allows by running `router-model.cjs
+auto` daily (a scheduled task does this), so nobody has to remember to switch it
+back when the quota refreshes.
 
 ---
 

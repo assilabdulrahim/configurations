@@ -85,13 +85,26 @@ function inventory(base) {
   return acc;
 }
 
+// The router's `model:` line is the one deliberate difference: the repo pins K3
+// and scripts/router-model.cjs moves the DEPLOYED pin to DeepSeek while the Kimi
+// quota is out. Reporting that as drift would invite a deploy that silently
+// puts the router back on a dead provider, so it is compared separately and
+// reported as a state.
+const ROUTER_FILE = 'agents/orchestrator.md';
+const MODEL_LINE = /^model:[ \t]*(\S+)/m;
+const routerPins = {};
+
 // Compare bytes, not mtimes: a copy updates the timestamp whether or not the
 // content changed, so mtime would report drift on every deploy.
 function same(rel) {
   try {
     const a = fs.readFileSync(path.join(SRC, rel));
     const b = fs.readFileSync(path.join(DEST, rel));
-    return a.equals(b);
+    if (rel !== ROUTER_FILE) return a.equals(b);
+    const sa = a.toString('utf8'), sb = b.toString('utf8');
+    routerPins.repo = (sa.match(MODEL_LINE) || [])[1];
+    routerPins.deployed = (sb.match(MODEL_LINE) || [])[1];
+    return sa.replace(MODEL_LINE, 'model:') === sb.replace(MODEL_LINE, 'model:');
   } catch { return false; }
 }
 
@@ -116,6 +129,12 @@ log('   deployed: ' + DEST);
 log('');
 
 const drift = onlySrc.length + onlyDst.length + differ.length;
+
+if (routerPins.repo && routerPins.deployed && routerPins.repo !== routerPins.deployed) {
+  log('NOTE router pin: repo ' + routerPins.repo + ', deployed ' + routerPins.deployed +
+    ' (standby - router-model.cjs auto restores it; not counted as drift)');
+  log('');
+}
 
 if (QUIET) console.log(drift);
 

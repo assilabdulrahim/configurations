@@ -12,7 +12,12 @@
   //   L2 SUBSCRIPTION  Kimi. Flat cost but FINITE QUOTA. The default tier.
   //   L3 METERED       DeepSeek, Google, OpenRouter, Anthropic. Per-token.
   //                    Analysis + validation, the provider-outage escape hatch,
-  //                    and one reserved agent (see below).
+  //                    and two reserved Anthropic agents (see below).
+  //
+  // The router (agents/orchestrator.md) runs on K3 whenever the Kimi quota is
+  // live and on DeepSeek Flash when it is not - scripts/router-model.cjs
+  // switches the deployed pin before a session starts (opencode cannot fail a
+  // primary agent over mid-session).
   //
   // The rule the router follows (agents/orchestrator.md §2):
   //
@@ -21,8 +26,9 @@
   //   Use L0 for privacy, compression and trivia.
   //   Never validate a model's work with the same model.
   //
-  // L0 keeps two jobs nothing else should take: work that must not leave
-  // the LAN, and session compression, which is high-volume and mechanical.
+  // L0 keeps the jobs nothing else should take: work that must not leave
+  // the LAN, session compression, and housekeeping - logging, records and
+  // mechanical audits - run in parallel with the paid hops (orchestrator §14).
   // The full escalation ladder is in agents/orchestrator.md.
 
   // Default when no agent is selected. A free OpenCode Zen model - 200k
@@ -40,22 +46,41 @@
   "default_agent": "orchestrator",
 
   // ── Providers ────────────────────────────────────────────────
-  // opencode (Zen), deepseek, moonshotai, kimi-for-coding and anthropic are all
-  // first-class in models.dev - they need `opencode auth login`, not a
-  // provider block. Only the local box needs describing.
+  // opencode (Zen), deepseek, moonshotai and anthropic are first-class in
+  // models.dev - they need `opencode auth login`, not a provider block.
+  // kimi-for-coding and the local box are described below.
   //
-  // anthropic is the newest of these and reaches exactly one agent,
-  // `prompt-smith` (anthropic/claude-sonnet-5), which writes the §10 briefs
-  // other agents run on and the agents/ and skills/ prompt files themselves.
-  // It is metered per token, so it is gated: agents/orchestrator.md §7 names
-  // the three conditions under which the router may reach it, and §5 keeps it
-  // out of every fallback chain so nothing failing can spend on it by accident.
-  // Reachable directly with /prompt. Until the anthropic credential exists -
+  // anthropic reaches two agents: `prompt-smith` (claude-sonnet-5), which
+  // writes the §10 briefs and the agents/ and skills/ prompt files, and
+  // `opus-coder` (claude-opus-5), the escalation implementer. Both are metered
+  // per token and spent in moderation, so both are gated: agents/orchestrator.md
+  // §7 names the conditions under which the router may reach each (opus-coder
+  // also carries a two-hops-per-session budget), and §5 keeps both out of every
+  // fallback chain so nothing failing can spend on them by accident.
+  // Reachable directly with /prompt and /opus. Until the anthropic credential exists -
   // added in the app's provider settings, or supplied as ANTHROPIC_API_KEY in
   // the environment, or via `opencode auth login` if you use the CLI - that one
   // agent is DEAD and nothing else is affected. preflight.cjs reports which of
   // those sources is actually in play.
   "provider": {
+    // Pinned here, not left to models.dev. On 2026-09-18 models.dev renamed this
+    // provider to `kimi-code-plan-global`, so `kimi-for-coding/*` stopped
+    // resolving - and opencode does not fail an unresolvable subagent pin, it
+    // silently runs the subagent on the CALLER's model (deepseek-flash). That is
+    // how 862 "moonshot-coder" messages ran on DeepSeek and were then "validated"
+    // by DeepSeek. The id stays `kimi-for-coding` so the existing auth.json
+    // credential and every agent pin keep working.
+    "kimi-for-coding": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Kimi Code (subscription)",
+      "options": { "baseURL": "https://api.kimi.com/coding/v1" },
+      "models": {
+        "k3": { "name": "Kimi K3 (1M)", "tool_call": true, "attachment": true, "limit": { "context": 1048576, "output": 131072 } },
+        "k3-256k": { "name": "Kimi K3 (256k)", "tool_call": true, "attachment": true, "limit": { "context": 262144, "output": 131072 } },
+        "kimi-for-coding": { "name": "Kimi for Coding", "tool_call": true, "attachment": true, "limit": { "context": 1048576, "output": 32768 } },
+        "kimi-for-coding-highspeed": { "name": "Kimi for Coding Highspeed", "tool_call": true, "attachment": true, "limit": { "context": 262144, "output": 32768 } }
+      }
+    },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Linux AI Server",
@@ -148,83 +173,90 @@
       "description": "Write the brief for a hop, or author/audit an agent or skill prompt",
       "agent": "prompt-smith",
       "template": "$ARGUMENTS"
+    },
+    "opus": {
+      "description": "Send this task to Claude Opus 5 - the strongest implementer, metered (Anthropic credit)",
+      "agent": "opus-coder",
+      "template": "$ARGUMENTS"
+    },
+    "router": {
+      // On local-reasoner (ollama) on purpose: this is the command you reach for
+      // when the router's own provider is down, so it must not depend on it -
+      // or on any cloud provider.
+      "description": "Re-pin the router: K3 if the Kimi quota is live, DeepSeek Flash if not",
+      "agent": "local-reasoner",
+      "template": "Run exactly: node C:/Users/AssilAbdulrahim/.config/opencode/scripts/router-model.cjs auto $ARGUMENTS - then report its output verbatim and tell the user the new pin applies to the next session."
     }
   },
 
   // ── Permissions ──────────────────────────────────────────────
+  // Allow by default; deny only what is destructive or outbound. There is
+  // deliberately NO "ask" anywhere in this config or in agents/*.md.
+  //
+  // Why: an "ask" raised inside a SUBAGENT blocks that subagent's session, and
+  // the prompt is not shown in the orchestrator session you are watching. The
+  // traces for 2026-09-13..19 show 37 shell calls parked on such prompts for
+  // 82.6 hours in total (single calls of 8-11h, e.g. `mkdir`, `Get-Location`),
+  // against 11.3h of model time and 4.3h of real command execution. The old
+  // allow-list also only knew bash verbs (ls, cat, grep) while the shell here
+  // is PowerShell, so nearly every Get-ChildItem / Test-Path / & dotnet fell
+  // through to "ask". A deny returns an error the model can act on; an ask
+  // hangs. So: allow, or deny - never ask.
+  //
+  // Precedence: the LAST matching rule wins, so "*" comes first and every deny
+  // after it. opencode parses PowerShell imperfectly (it split here-strings
+  // into lines and asked about prose), so this deny list is a best-effort net,
+  // not a sandbox. Agent files carry no bash block - they inherit this one.
   "permission": {
     "edit": "allow",
-    "webfetch": "ask",
+    "webfetch": "allow",
+    // Paths outside the project. Models hallucinate paths (source\recv\repos,
+    // BrainRegistration365) and quote remote ssh paths (~/kbqs-it); each used to
+    // raise a prompt for a folder that does not exist. Allow, except secrets.
+    "external_directory": {
+      "*": "allow",
+      "C:/Users/*/.ssh/*": "deny",
+      "C:/Users/*/.local/share/opencode/auth.json": "deny"
+    },
     "bash": {
-      "*": "ask",
+      "*": "allow",
 
-      // Destructive or outbound. Listed FIRST and kept non-overlapping with the
-      // read set below, so the outcome never depends on match precedence.
+      // bash / POSIX
       "sudo *": "deny",
+      // Every deny the previous config had is kept: all of rm, rmdir, and
+      // find -delete / -exec (find -exec can run rm by another name).
       "rm *": "deny",
       "rmdir *": "deny",
-      "mv *": "ask",
-      "chmod *": "ask",
-      "chown *": "ask",
-      "curl *": "ask",
-      "wget *": "ask",
-      "git push *": "ask",
-      "git reset *": "ask",
-      "git clean *": "ask",
       "find * -delete*": "deny",
       "find * -exec*": "deny",
+      "dd *": "deny",
+      "mkfs*": "deny",
+      "shutdown*": "deny",
+      "reboot*": "deny",
 
-      // Read-only shell. Each verb appears bare AND with arguments: "ls *"
-      // needs a space and an argument, so a plain "ls" would otherwise fall
-      // through to "*": ask - that fall-through was the main source of prompts.
-      "pwd": "allow",
-      "ls": "allow",
-      "ls *": "allow",
-      "tree": "allow",
-      "tree *": "allow",
-      "cat *": "allow",
-      "head *": "allow",
-      "tail *": "allow",
-      "wc *": "allow",
-      "stat *": "allow",
-      "file *": "allow",
-      "du *": "allow",
-      "df *": "allow",
-      "which *": "allow",
-      "echo *": "allow",
-      "grep *": "allow",
-      "rg *": "allow",
-      "fd *": "allow",
-      "find *": "allow",
-      "jq *": "allow",
-      "sed -n *": "allow",
+      // PowerShell / cmd
+      "Remove-Item * -Recurse*": "deny",
+      "Remove-Item -Recurse*": "deny",
+      "rd /s*": "deny",
+      "del /s*": "deny",
+      "Format-Volume*": "deny",
+      "Clear-Disk*": "deny",
+      "Stop-Computer*": "deny",
+      "Restart-Computer*": "deny",
+      "Set-ExecutionPolicy*": "deny",
 
-      // git, read-only subcommands. Mutating ones are absent, not merely denied.
-      "git status": "allow",
-      "git status *": "allow",
-      "git diff": "allow",
-      "git diff *": "allow",
-      "git log": "allow",
-      "git log *": "allow",
-      "git show *": "allow",
-      "git blame *": "allow",
-      "git grep *": "allow",
-      "git ls-files*": "allow",
-      "git rev-parse *": "allow",
-      "git describe*": "allow",
-      "git shortlog*": "allow",
-      "git remote -v": "allow",
-      "git cat-file *": "allow",
-      "git config --get *": "allow",
-      "git stash list": "allow",
-      "git worktree list": "allow",
-      "git branch": "allow",
-      "git branch -a": "allow",
-      "git branch -v": "allow",
-      "git branch -vv": "allow",
-      "git branch --list *": "allow",
-      "git branch --merged*": "allow",
-      "git tag": "allow"
+      // git: history-destroying or outbound. Push yourself.
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "git clean*": "deny",
+      "git checkout -- *": "deny",
+      "git restore *": "deny",
+      "git branch -D*": "deny",
+      "git stash drop*": "deny",
+      "git stash clear*": "deny",
+      "git filter-branch*": "deny",
+      "gh pr merge*": "deny",
+      "gh repo delete*": "deny"
     }
   },
 

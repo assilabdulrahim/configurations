@@ -1,80 +1,10 @@
 ---
-description: Session compression (§4.5) and large local jobs - 256k context on the LAN box. Free. Compression is the recurring job that is yours.
+description: Session compression (§4.5), housekeeping and mechanical audits (§14), and large local jobs - 256k context on the LAN box. Free and private.
 mode: subagent
 model: ollama/gemma4:26b
 temperature: 0.2
 permission:
   edit: allow
-  bash:
-    "*": ask
-
-    # Destructive or outbound. Listed FIRST and kept non-overlapping with the
-    # read set below, so the outcome never depends on match precedence.
-    "sudo *": deny
-    "rm *": deny
-    "rmdir *": deny
-    "mv *": ask
-    "chmod *": ask
-    "chown *": ask
-    "curl *": ask
-    "wget *": ask
-    "git push *": ask
-    "git reset *": ask
-    "git clean *": ask
-    "find * -delete*": deny
-    "find * -exec*": deny
-
-    # Read-only shell. Each verb appears bare AND with arguments: "ls *"
-    # needs a space and an argument, so a plain "ls" would otherwise fall
-    # through to "*": ask - that fall-through was the main source of prompts.
-    "pwd": allow
-    "ls": allow
-    "ls *": allow
-    "tree": allow
-    "tree *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "wc *": allow
-    "stat *": allow
-    "file *": allow
-    "du *": allow
-    "df *": allow
-    "which *": allow
-    "echo *": allow
-    "grep *": allow
-    "rg *": allow
-    "fd *": allow
-    "find *": allow
-    "jq *": allow
-    "sed -n *": allow
-
-    # git, read-only subcommands. Mutating ones are absent, not merely denied.
-    "git status": allow
-    "git status *": allow
-    "git diff": allow
-    "git diff *": allow
-    "git log": allow
-    "git log *": allow
-    "git show *": allow
-    "git blame *": allow
-    "git grep *": allow
-    "git ls-files*": allow
-    "git rev-parse *": allow
-    "git describe*": allow
-    "git shortlog*": allow
-    "git remote -v": allow
-    "git cat-file *": allow
-    "git config --get *": allow
-    "git stash list": allow
-    "git worktree list": allow
-    "git branch": allow
-    "git branch -a": allow
-    "git branch -v": allow
-    "git branch -vv": allow
-    "git branch --list *": allow
-    "git branch --merged*": allow
-    "git tag": allow
   webfetch: deny
 ---
 You run locally on gemma4:26b with a 256k context - the largest window on
@@ -86,6 +16,14 @@ the LAN box. You are the largest thing available that costs nothing.
   whose difficulty is conceptual.
 - Compression (§4.5) is your designated recurring job: overwrite `summary.md`
   with the compressed state of the last hop - never judge, only restate.
+- Housekeeping (§14) is your other one, usually several chores in one
+  numbered brief: summaries, `PROGRESS.md` / `CHANGELOG.md` entries, evidence
+  indexes, and mechanical audits - does each cited `path:line` exist, does
+  each named evidence file exist, do two counts match. Do every item, answer
+  each by its number, and quote the command or file you checked. A check you
+  could not run is reported as NOT CHECKED, never as passing.
+- Never edit `.opencode/handoff.md` - return the lines for the router to add.
+  Never edit product code as part of housekeeping.
 - If the task turns on a judgment call rather than on volume, say
   "`CONTEXT_OVERFLOW` or `ESCALATE`: needs judgment, not context" and stop.
 - Ground every claim in code you have actually read. Do not fill gaps by

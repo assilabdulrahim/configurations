@@ -12,7 +12,12 @@
   //   L2 SUBSCRIPTION  Kimi. Flat cost but FINITE QUOTA. The default tier.
   //   L3 METERED       DeepSeek, Google, OpenRouter, Anthropic. Per-token.
   //                    Analysis + validation, the provider-outage escape hatch,
-  //                    and one reserved agent (see below).
+  //                    and two reserved Anthropic agents (see below).
+  //
+  // The router (agents/orchestrator.md) runs on K3 whenever the Kimi quota is
+  // live and on DeepSeek Flash when it is not - scripts/router-model.cjs
+  // switches the deployed pin before a session starts (opencode cannot fail a
+  // primary agent over mid-session).
   //
   // The rule the router follows (agents/orchestrator.md §2):
   //
@@ -21,8 +26,9 @@
   //   Use L0 for privacy, compression and trivia.
   //   Never validate a model's work with the same model.
   //
-  // L0 keeps two jobs nothing else should take: work that must not leave
-  // the LAN, and session compression, which is high-volume and mechanical.
+  // L0 keeps the jobs nothing else should take: work that must not leave
+  // the LAN, session compression, and housekeeping - logging, records and
+  // mechanical audits - run in parallel with the paid hops (orchestrator §14).
   // The full escalation ladder is in agents/orchestrator.md.
 
   // Default when no agent is selected. A free OpenCode Zen model - 200k
@@ -44,13 +50,14 @@
   // models.dev - they need `opencode auth login`, not a provider block.
   // kimi-for-coding and the local box are described below.
   //
-  // anthropic is the newest of these and reaches exactly one agent,
-  // `prompt-smith` (anthropic/claude-sonnet-5), which writes the §10 briefs
-  // other agents run on and the agents/ and skills/ prompt files themselves.
-  // It is metered per token, so it is gated: agents/orchestrator.md §7 names
-  // the three conditions under which the router may reach it, and §5 keeps it
-  // out of every fallback chain so nothing failing can spend on it by accident.
-  // Reachable directly with /prompt. Until the anthropic credential exists -
+  // anthropic reaches two agents: `prompt-smith` (claude-sonnet-5), which
+  // writes the §10 briefs and the agents/ and skills/ prompt files, and
+  // `opus-coder` (claude-opus-5), the escalation implementer. Both are metered
+  // per token and spent in moderation, so both are gated: agents/orchestrator.md
+  // §7 names the conditions under which the router may reach each (opus-coder
+  // also carries a two-hops-per-session budget), and §5 keeps both out of every
+  // fallback chain so nothing failing can spend on them by accident.
+  // Reachable directly with /prompt and /opus. Until the anthropic credential exists -
   // added in the app's provider settings, or supplied as ANTHROPIC_API_KEY in
   // the environment, or via `opencode auth login` if you use the CLI - that one
   // agent is DEAD and nothing else is affected. preflight.cjs reports which of
@@ -166,6 +173,19 @@
       "description": "Write the brief for a hop, or author/audit an agent or skill prompt",
       "agent": "prompt-smith",
       "template": "$ARGUMENTS"
+    },
+    "opus": {
+      "description": "Send this task to Claude Opus 5 - the strongest implementer, metered (Anthropic credit)",
+      "agent": "opus-coder",
+      "template": "$ARGUMENTS"
+    },
+    "router": {
+      // On local-reasoner (ollama) on purpose: this is the command you reach for
+      // when the router's own provider is down, so it must not depend on it -
+      // or on any cloud provider.
+      "description": "Re-pin the router: K3 if the Kimi quota is live, DeepSeek Flash if not",
+      "agent": "local-reasoner",
+      "template": "Run exactly: node C:/Users/AssilAbdulrahim/.config/opencode/scripts/router-model.cjs auto $ARGUMENTS - then report its output verbatim and tell the user the new pin applies to the next session."
     }
   },
 
@@ -203,11 +223,12 @@
 
       // bash / POSIX
       "sudo *": "deny",
-      "rm -r*": "deny",
-      "rm -f*": "deny",
-      "rm -*r*": "deny",
+      // Every deny the previous config had is kept: all of rm, rmdir, and
+      // find -delete / -exec (find -exec can run rm by another name).
+      "rm *": "deny",
       "rmdir *": "deny",
       "find * -delete*": "deny",
+      "find * -exec*": "deny",
       "dd *": "deny",
       "mkfs*": "deny",
       "shutdown*": "deny",

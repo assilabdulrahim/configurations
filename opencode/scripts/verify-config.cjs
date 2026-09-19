@@ -153,7 +153,8 @@ console.log('\n-- cross-model validation --');
 const { family: fam } = require(path.join(__dirname, 'lib', 'families.cjs'));
 const impl = ['local-quick', 'local-coder', 'local-reasoner', 'free-coder', 'pickle-coder',
   'free-thinker', 'free-analyst', 'doc-writer', 'coder', 'speed-coder', 'python-dev',
-  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder', 'moonshot-coder'];
+  'dotnet-dev', 'deep-thinker', 'architect', 'cloud-architect', 'wide-coder', 'glm-coder', 'moonshot-coder',
+  'opus-coder'];
 const vals = ['free-validator', 'local-validator', 'reviewer', 'validator', 'validator-openrouter',
   'validator-minimax', 'security-reviewer'];
 for (const a of [...impl, ...vals]) console.log('     ' + a.padEnd(19) + fam(pin(a)));

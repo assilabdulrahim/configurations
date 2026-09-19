@@ -61,16 +61,27 @@ const AUTH = path.join(os.homedir(), '.local', 'share', 'opencode', 'auth.json')
 // re-authenticating a provider that was never broken.
 const ENV_KEYS = { anthropic: 'ANTHROPIC_API_KEY' };
 
-// The router itself runs on deepseek/deepseek-flash. That is a deliberate
-// choice - see agents/orchestrator.md - and it means DeepSeek hitting zero
-// stops EVERY request, not just the DeepSeek-tier ones. So warn early and
-// loudly rather than at the moment it fails.
+// The router runs on K3 when the Kimi quota is live and on deepseek/deepseek-flash
+// when it is not (scripts/router-model.cjs switches it). While it is on DeepSeek,
+// DeepSeek hitting zero stops EVERY request, not just the DeepSeek-tier ones - so
+// warn early and loudly. While it is on K3, a low DeepSeek balance only costs the
+// deepseek agents (reviewer, tester, repo-analyst, security-reviewer).
 // Overridable so the warning path can be exercised without draining an account:
 //   DEEPSEEK_LOW_USD=999 node scripts/preflight.cjs
 const DEEPSEEK_LOW_USD = Number(process.env.DEEPSEEK_LOW_USD || 10);
 const DEEPSEEK_CRITICAL_USD = Number(process.env.DEEPSEEK_CRITICAL_USD || 2);
 
-const out = { authed: {}, ollama: null, balances: {}, credentials: {}, reachable: {}, agents: {}, reload: null };
+// Read from the agents/ directory next to this script - the deployed copy when
+// run from ~/.config/opencode, which is the pin opencode actually loads.
+const ROUTER = (() => {
+  try {
+    const src = fs.readFileSync(path.join(__dirname, '..', 'agents', 'orchestrator.md'), 'utf8');
+    return (src.match(/^model:[ \t]*(\S+)/m) || [])[1] || 'unknown';
+  } catch { return 'unknown'; }
+})();
+const ROUTER_ON_DEEPSEEK = ROUTER.startsWith('deepseek/');
+
+const out = { router: ROUTER, authed: {}, ollama: null, balances: {}, credentials: {}, reachable: {}, agents: {}, reload: null };
 const log = (...a) => { if (!JSON_OUT) console.log(...a); };
 
 function reloadNotice(bal, cur, state) {
@@ -82,15 +93,20 @@ function reloadNotice(bal, cur, state) {
   log('  ' + '='.repeat(68));
   log('  ** ' + head);
   log('  ' + '='.repeat(68));
-  log('  The router itself runs on deepseek/deepseek-flash. At zero it stops');
-  log('  and cannot re-route itself, so EVERY request fails - not only the');
-  log('  ones that would have used DeepSeek.');
+  if (ROUTER_ON_DEEPSEEK) {
+    log('  The router is on ' + ROUTER + '. At zero it stops and cannot');
+    log('  re-route itself, so EVERY request fails - not only the ones that');
+    log('  would have used DeepSeek.');
+  } else {
+    log('  The router is on ' + ROUTER + ', so sessions keep running; the');
+    log('  deepseek agents (reviewer, tester, repo-analyst, security-reviewer)');
+    log('  fail and the router walks their backups.');
+  }
   log('');
   log('  RELOAD:   https://platform.deepseek.com  ->  Top up / Billing');
   log('');
-  log('  Or move the router to the flat-cost standby (1M context, no metering):');
-  log('    sed -i "s|^model: deepseek/.*|model: kimi-for-coding/k3|" \\');
-  log('      agents/orchestrator.md');
+  log('  Or put the router on K3, if the Kimi quota is live:');
+  log('    node scripts/router-model.cjs auto');
   log('');
   log('  Then re-run: node scripts/preflight.cjs');
   log('  ' + '='.repeat(68));
@@ -122,6 +138,9 @@ async function head(url, headers, timeoutMs = 8000) {
   for (const [id, envVar] of Object.entries(ENV_KEYS))
     if (!out.authed[id] && process.env[envVar]) out.authed[id] = 'env:' + envVar;
 
+  log('-- router --');
+  log('  ' + ROUTER + (ROUTER_ON_DEEPSEEK ? '  (standby - K3 is the intended pin; node scripts/router-model.cjs auto)' : ''));
+  log('');
   log('-- authenticated providers --');
   for (const [id, t] of Object.entries(out.authed)) log('  OK   ' + id.padEnd(20) + t);
   if (!Object.keys(out.authed).length) log('  (none)');
@@ -157,7 +176,8 @@ async function head(url, headers, timeoutMs = 8000) {
         : bal < DEEPSEEK_CRITICAL_USD ? 'CRITICAL'
           : bal < DEEPSEEK_LOW_USD ? 'LOW' : 'OK';
       out.balances.deepseek = { available: b.is_available, total: bal, currency: cur, state };
-      out.reload = state === 'OK' ? null : state;
+      // Exit 2 ("reload now") only when this balance can stop the router.
+      out.reload = state === 'OK' || !ROUTER_ON_DEEPSEEK ? null : state;
       log('  ' + (state === 'OK' ? 'OK  ' : state.padEnd(4)) + ' deepseek        ' +
         (isNaN(bal) ? '?' : bal.toFixed(2)) + ' ' + cur);
       if (state !== 'OK') reloadNotice(bal, cur, state);

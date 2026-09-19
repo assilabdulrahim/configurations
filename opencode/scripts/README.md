@@ -27,16 +27,19 @@ Then it marks every agent `OK` or `DEAD`. The router must never route to a
 
 ### The reload warning
 
-The router itself runs on `deepseek/deepseek-flash`, so DeepSeek hitting
-zero stops **every** request, not just DeepSeek-tier ones. Preflight warns
-early and loudly rather than at the moment it fails:
+The router runs on K3 when the Kimi quota is live and on
+`deepseek/deepseek-flash` when it is not (`router-model.cjs`, below). While it
+is on DeepSeek, DeepSeek hitting zero stops **every** request, not just
+DeepSeek-tier ones, so preflight warns early and loudly. The `-- router --`
+line says which pin is deployed. On K3 a low DeepSeek balance still prints the
+notice but exits 0 - it only costs the deepseek agents, which have backups:
 
 | State | Balance | Exit |
 |---|---|---|
 | `OK` | >= $10 | 0 (or 1 if an agent is unreachable) |
-| `LOW` | < $10 | 2 |
-| `CRITICAL` | < $2 | 2 |
-| `EMPTY` | 0 | 2 |
+| `LOW` | < $10 | 2 on DeepSeek, 0 on K3 |
+| `CRITICAL` | < $2 | 2 on DeepSeek, 0 on K3 |
+| `EMPTY` | 0 | 2 on DeepSeek, 0 on K3 |
 
 Anything but `OK` prints a block with the reload URL and the flat-cost
 standby command. Thresholds are env-overridable, which is how you exercise
@@ -171,3 +174,25 @@ at midnight. Local models are called cold, so the first call to a 70B includes
 load time — expect ~75 s, not a hang. Vision uses a solid 64x64 PNG on purpose:
 a 1x1 pixel is rejected as `failed to decode` by several backends, which reads
 exactly like "this model is blind" and is not.
+
+## `router-model.cjs` — keep the router on K3 whenever K3 is there
+
+```bash
+node scripts/router-model.cjs auto       # probe Kimi, pin K3 or DeepSeek
+node scripts/router-model.cjs status     # print the deployed pin
+node scripts/router-model.cjs kimi       # or: deepseek - force one
+```
+
+opencode cannot fail the primary agent over, so a Kimi outage with the router
+on K3 stops every request. This script moves the pin **between** sessions: it
+sends Kimi a one-token completion (a `/models` call answers 200 on an exhausted
+quota, so it proves nothing) and pins K3 on success, DeepSeek Flash otherwise.
+It edits the deployed copy only; the repo always pins K3, and `sync-check.cjs`
+reports a differing router pin as a note, not as drift.
+
+### Honest limits
+
+A running session keeps the model it started with - the new pin applies to the
+next one. A Kimi outage that starts mid-session still stops that session; run
+`/router` (it runs on the local box) or this script, then start a new session.
+Kimi reports an exhausted monthly quota as **403**, not 429.

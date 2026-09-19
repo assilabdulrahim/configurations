@@ -40,7 +40,7 @@ const TIERS = [
   ['wide-coder', 'kimi-for-coding/k3', 1048576],
   ['free-thinker', 'opencode/nemotron-3-ultra-free', 1000000],
   ['free-analyst', 'opencode/muse-spark-1.2-contributor-free', 1048576],
-  ['orchestrator', 'deepseek/deepseek-flash', 1000000],
+  ['orchestrator', 'kimi-for-coding/k3', 1048576],
   ['repo-analyst', 'deepseek/deepseek-flash', 1000000],
   ['reviewer', 'deepseek/deepseek-flash', 1000000],
   ['security-reviewer', 'deepseek/deepseek-flash', 1000000],
@@ -50,6 +50,7 @@ const TIERS = [
   ['validator-minimax', 'minimax/MiniMax-M3', 1048576],
   ['moonshot-coder', 'moonshotai/kimi-k3', 1048576],
   ['prompt-smith', 'anthropic/claude-sonnet-5', 1000000],
+  ['opus-coder', 'anthropic/claude-opus-5', 1000000],
   ['glm-coder', 'openrouter/z-ai/glm-5.3-flash', 1310720],
 ];
 

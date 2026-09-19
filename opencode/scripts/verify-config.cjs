@@ -39,6 +39,11 @@ const local = new Set(require(SP + '/tags.json').models.map(m => m.name));
 const agentFiles = fs.readdirSync(path.join(ROOT, 'agents')).filter(f => f.endsWith('.md'));
 const agents = new Set(agentFiles.map(f => f.replace(/\.md$/, '')));
 const pin = a => (fs.readFileSync(path.join(ROOT, 'agents', a + '.md'), 'utf8').match(/^model:\s*(\S+)/m) || [])[1];
+// A provider block in opencode.jsonc outranks models.dev - that is how
+// kimi-for-coding survives models.dev renaming it (see the comment there).
+// ollama is excluded: its truth is the box's tags.json, not the config.
+const catalog = (p, id) => (p !== 'ollama' && cfg.provider[p] && cfg.provider[p].models[id])
+  || (md[p] && md[p].models[id]);
 
 // --- 1. every agent pins a model that actually resolves, with tool calling
 console.log('\n-- agent model pins --');
@@ -50,8 +55,10 @@ for (const a of [...agents].sort()) {
     if (!local.has(id)) bad(a + ' -> ' + m + ' NOT PULLED on the ollama box');
     else console.log('OK   ' + a.padEnd(19) + m);
   } else {
-    const e = md[p] && md[p].models[id];
-    if (!e) bad(a + ' -> ' + m + ' NOT IN models.dev');
+    const e = catalog(p, id);
+    // Not cosmetic: opencode does not fail an unresolvable subagent pin, it
+    // runs that subagent on the caller's model without saying so.
+    if (!e) bad(a + ' -> ' + m + ' NOT IN models.dev or opencode.jsonc (would silently run on the caller\'s model)');
     else if (!e.tool_call) bad(a + ' -> ' + m + ' HAS NO TOOL CALLING (cannot drive an agent)');
     else {
       // models.dev reports cost 0 for subscription PLANS too, so classify by provider.
@@ -134,7 +141,7 @@ for (const id of Object.keys(cfg.provider.ollama.models))
 console.log('OK   all ' + Object.keys(cfg.provider.ollama.models).length + ' configured ollama models are pulled');
 for (const [k, v] of Object.entries({ model: cfg.model, small_model: cfg.small_model })) {
   const i = v.indexOf('/'), p = v.slice(0, i), id = v.slice(i + 1);
-  const ok = p === 'ollama' ? local.has(id) : !!(md[p] && md[p].models[id]);
+  const ok = p === 'ollama' ? local.has(id) : !!catalog(p, id);
   if (!ok) bad(k + ' -> ' + v + ' does not resolve');
   else console.log('OK   ' + k.padEnd(14) + '= ' + v);
 }
@@ -169,7 +176,7 @@ console.log('\n-- ctx-estimate tier table --');
     if (actual !== model) { bad('ctx-estimate says ' + agent + ' = ' + model + ', agents/ says ' + actual); continue; }
     // ollama windows come from the box, not models.dev - no catalog to check
     const i = model.indexOf('/'), p = model.slice(0, i), id = model.slice(i + 1);
-    const e = p === 'ollama' ? null : md[p] && md[p].models[id];
+    const e = p === 'ollama' ? null : catalog(p, id);
     if (e && Number(ctx) !== e.limit.context)
       bad('ctx-estimate says ' + agent + ' ctx=' + ctx + ', models.dev says ' + e.limit.context);
     else console.log('OK   ' + agent.padEnd(16) + ctx.padStart(9) + '  ' + model);
@@ -231,6 +238,30 @@ console.log('\n-- backups --');
     if (ok) console.log('OK   ' + a.padEnd(21) + b.map(x => x + ' (' + prov(x) + ')').join(', '));
   }
   for (const a of rows.keys()) if (!agents.has(a)) bad('"## Backups per agent" lists unknown agent: ' + a);
+}
+
+// --- 10. no permission rule says "ask". An ask raised inside a subagent blocks
+//         that session behind a prompt the user is not looking at: 37 calls sat
+//         82.6h that way in one week (2026-09-13..19). Rules are allow or deny.
+console.log('\n-- permissions --');
+{
+  let asks = 0;
+  const ASK_RULE = /^\s*("[^"]*"|[a-z_]+)\s*:\s*"?ask"?\s*(,|#|$)/;
+  const scan = (where, text) => {
+    for (const [i, line] of text.split(/\r?\n/).entries()) {
+      if (!ASK_RULE.test(line)) continue;
+      bad(where + ':' + (i + 1) + ' permission rule is "ask" - use allow or deny');
+      asks++;
+    }
+  };
+  // opencode.jsonc is scanned after stripping comments, so its line numbers
+  // are approximate; the rule text itself is what to search for.
+  scan('opencode.jsonc', stripJsonc(fs.readFileSync(path.join(ROOT, 'opencode.jsonc'), 'utf8')));
+  for (const a of [...agents].sort()) {
+    const fm = fs.readFileSync(path.join(ROOT, 'agents', a + '.md'), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (fm) scan('agents/' + a + '.md', fm[1]);
+  }
+  if (!asks) console.log('OK   no "ask" rules in opencode.jsonc or agents/*.md');
 }
 
 console.log('\n' + (fail ? fail + ' FAILURES' : 'ALL CHECKS PASSED'));

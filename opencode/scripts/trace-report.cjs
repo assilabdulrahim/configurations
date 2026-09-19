@@ -107,6 +107,45 @@ out.errors = Object.entries(msgs.filter(m => m.error).reduce((acc, m) => {
   return acc;
 }, {})).sort((a, b) => b[1] - a[1]);
 
+// ---- pin drift --------------------------------------------------------
+// opencode does not fail a subagent whose pinned model cannot be resolved (a
+// provider renamed in models.dev, a model id that does not exist) - it silently
+// runs it on the CALLER's model. 2026-09-14..17: 862 moonshot-coder messages ran
+// on deepseek-flash this way and were then validated by deepseek, so the
+// cross-family rule in orchestrator.md §8 was void without anyone seeing it.
+// Pins are read from agents/ next to this script. A primary agent switched by
+// hand (the §5 standby pins) also shows here - that one is expected.
+const AGENTS_DIR = path.join(__dirname, '..', 'agents');
+const pins = {};
+if (fs.existsSync(AGENTS_DIR))
+  for (const f of fs.readdirSync(AGENTS_DIR).filter(x => x.endsWith('.md'))) {
+    const m = fs.readFileSync(path.join(AGENTS_DIR, f), 'utf8').match(/^model:\s*(\S+)/m);
+    if (m) pins[f.replace(/\.md$/, '')] = m[1];
+  }
+out.drift = Object.entries(msgs.reduce((acc, m) => {
+  const want = pins[m.agent];
+  const got = m.providerID + '/' + m.modelID;
+  if (want && got !== want) {
+    const k = m.agent + '|' + want + '|' + got;
+    acc[k] = (acc[k] || 0) + 1;
+  }
+  return acc;
+}, {})).map(([k, calls]) => {
+  const [agent, pinned, ran] = k.split('|');
+  return { agent, pinned, ran, calls };
+}).sort((a, b) => b.calls - a.calls);
+
+// ---- stalled tools ----------------------------------------------------
+// A tool call that sits for minutes is almost never the command running - it
+// is a permission prompt raised inside a subagent session the user is not
+// looking at. 2026-09-13..19: 37 such calls, 82.6h, against 11.3h of model time.
+// `task` is excluded: its duration is the whole subagent hop, not a wait.
+const STALL_MS = 5 * 60 * 1000;
+const agentOf = new Map(msgs.map(m => [m.messageID, m.agent]));
+out.stalls = tools.filter(t => t.tool !== 'task' && Number(t.ms) >= STALL_MS)
+  .map(t => ({ ts: t.ts, agent: agentOf.get(t.messageID) || '?', tool: t.tool, ms: t.ms }))
+  .sort((a, b) => b.ms - a.ms);
+
 if (JSON_OUT) { console.log(JSON.stringify(out, null, 2)); process.exit(0); }
 
 console.log('traces: ' + files.length + ' file(s), ' + msgs.length + ' messages, ' +
@@ -143,3 +182,19 @@ for (const l of out.latency)
 console.log('\n-- errors --');
 if (!out.errors.length) console.log('   none recorded');
 else for (const [k, n] of out.errors) console.log('   ' + String(n).padStart(4) + '  ' + k);
+
+console.log('\n-- pin drift (agent ran on a model it is not pinned to) --');
+if (!Object.keys(pins).length) console.log('   no agents/ directory next to this script - cannot check');
+else if (!out.drift.length) console.log('   none - every agent ran on its pinned model');
+else for (const d of out.drift)
+  console.log('   ' + String(d.calls).padStart(5) + '  ' + d.agent.padEnd(18) +
+    'pinned ' + d.pinned + '  ran ' + d.ran);
+
+const hours = ms => (ms / 3600000).toFixed(1) + 'h';
+console.log('\n-- stalled tool calls (>= 5 min; usually a hidden permission prompt) --');
+if (!out.stalls.length) console.log('   none');
+else {
+  console.log('   ' + out.stalls.length + ' calls, ' + hours(sum(out.stalls, x => x.ms)) + ' total');
+  for (const t of out.stalls.slice(0, 10))
+    console.log('   ' + t.ts.slice(0, 16) + '  ' + t.agent.padEnd(18) + t.tool.padEnd(10) + hours(t.ms));
+}

@@ -6,89 +6,9 @@ temperature: 0.1
 permission:
   edit:
     "*": deny                     # the router routes; it does not edit code
-    ".opencode/handoff.md": allow # ...except the ledger, which it owns
-  bash:
-    "*": ask
-
-    # Destructive or outbound. Listed FIRST and kept non-overlapping with the
-    # read set below, so the outcome never depends on match precedence.
-    "sudo *": deny
-    "rm *": deny
-    "rmdir *": deny
-    "mv *": ask
-    "chmod *": ask
-    "chown *": ask
-    "curl *": ask
-    "wget *": ask
-    "git push *": ask
-    "git reset *": ask
-    "git clean *": ask
-    "find * -delete*": deny
-    "find * -exec*": deny
-
-    # Read-only shell. Each verb appears bare AND with arguments: "ls *"
-    # needs a space and an argument, so a plain "ls" would otherwise fall
-    # through to "*": ask - that fall-through was the main source of prompts.
-    "pwd": allow
-    "ls": allow
-    "ls *": allow
-    "tree": allow
-    "tree *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "wc *": allow
-    "stat *": allow
-    "file *": allow
-    "du *": allow
-    "df *": allow
-    "which *": allow
-    "echo *": allow
-    "grep *": allow
-    "rg *": allow
-    "fd *": allow
-    "find *": allow
-    "jq *": allow
-    "sed -n *": allow
-
-    # git, read-only subcommands. Mutating ones are absent, not merely denied.
-    "git status": allow
-    "git status *": allow
-    "git diff": allow
-    "git diff *": allow
-    "git log": allow
-    "git log *": allow
-    "git show *": allow
-    "git blame *": allow
-    "git grep *": allow
-    "git ls-files*": allow
-    "git rev-parse *": allow
-    "git describe*": allow
-    "git shortlog*": allow
-    "git remote -v": allow
-    "git cat-file *": allow
-    "git config --get *": allow
-    "git stash list": allow
-    "git worktree list": allow
-    "git branch": allow
-    "git branch -a": allow
-    "git branch -v": allow
-    "git branch -vv": allow
-    "git branch --list *": allow
-    "git branch --merged*": allow
-    "git tag": allow
-
-    # Absolute, because the router's cwd is the user's project, not the
-    # config dir - a relative "scripts/..." only resolves when they coincide.
-    # The profile segment is a wildcard so the rule is not pinned to one
-    # machine's username; the rest of the path stays anchored, so this still
-    # only ever authorises these three scripts inside an opencode config dir.
-    "node C:/Users/*/.config/opencode/scripts/preflight.cjs*": allow
-    "node C:/Users/*/.config/opencode/scripts/ctx-estimate.cjs*": allow
-    "node C:/Users/*/.config/opencode/scripts/sync-check.cjs*": allow
-    "node scripts/preflight.cjs*": allow
-    "node scripts/ctx-estimate.cjs*": allow
-  webfetch: ask
+    ".opencode/*": allow           # ...except its own workspace: the ledger,
+                                   # summary.md and briefs/ (see §10)
+  webfetch: allow
   task:
     "*": deny
     "local-quick": allow
@@ -474,7 +394,9 @@ DELIVERABLE: overwrite summary.md with, at most one page:
 
 **This is not optional and it is not a separate turn.** It happens as part of
 the ledger update at the end of every validated hop — see §11, which carries
-the mechanical form. Stated only here, it never fired once across four
+the mechanical form. **It never blocks the next hop:** dispatch it in the same
+message as the next `task` call (§12). Nothing downstream waits on
+`summary.md` except the *following* brief and gap analysis. Stated only here, it never fired once across four
 validated hops: an instruction that lives seven hundred lines from the
 procedure it belongs to is an instruction that does not exist.
 
@@ -644,8 +566,8 @@ same-provider backup, gives an editor a backup that cannot edit, or gives a
 validator a backup outside the validator set.
 
 ```
-architect              repo-analyst, free-thinker
-cloud-architect        repo-analyst, free-thinker
+architect              moonshot-coder, glm-coder
+cloud-architect        moonshot-coder, glm-coder
 deep-thinker           repo-analyst, free-thinker
 coder                  moonshot-coder, free-coder, glm-coder
 python-dev             moonshot-coder, free-coder, glm-coder
@@ -1198,5 +1120,65 @@ something you already do reliably, not sit as a separate good intention.
 If `local-reasoner` is down, write `COMPRESS: skipped, ollama unreachable`
 and move on. Do not buy it (§5).
 
-Delegate one specialist at a time and fold each result into the next brief.
 If nothing fits, say so and ask.
+
+---
+
+# 12. Parallel dispatch — the default, not the exception
+
+Several `task` calls **in the same message** run concurrently. Every hop you
+serialise that did not need to be serial is wall-clock the user waits for
+nothing. Before each turn, ask: *which of the calls I am about to make depend
+on each other's output?* Everything that does not goes out together.
+
+Always parallel:
+
+| Together, in one message | Why it is safe |
+|---|---|
+| `preflight.cjs` + `ctx-estimate.cjs` + a `repo-analyst` read | all read-only, no shared output |
+| the normal validator + `security-reviewer` on the same diff | both read-only; independent verdicts |
+| compression (`local-reasoner`, §4.5) + the next hop | compression writes only `summary.md`; the next brief does not need it |
+| gap analysis (§4.6) + the next in-`IN` hop | gap output goes to `## Parked`, never into the running hop |
+| two analysts on **disjoint** questions or paths | read-only |
+
+Parallel only when the write sets are disjoint:
+
+- Two implementers may run together **only** if their briefs name
+  non-overlapping files (or separate git worktrees) and neither needs the
+  other's result. Say which files each owns in each brief, and add
+  `DO NOT: edit any file outside <list>`.
+- If you cannot name the file sets in advance, it is not parallel work.
+
+Never parallel:
+
+- An implementer and the validator of that same change.
+- Two hops where the second one's brief would cite the first one's output.
+- Anything after a `SCOPE CHECK` in the same turn (§0).
+
+Fold all results into the ledger in one update after the batch returns. A
+failed call in a batch re-routes on its own (§5); the others' results stand.
+
+# 13. The hop budget — spend round trips like money
+
+A single strong model finishes most jobs in one session. This router pays for
+routing, briefing, validating and compressing on top, so every extra hop must
+earn its place:
+
+- **One file, one obvious change:** route, implement, done. No separate
+  validator round unless §8 calls it high-stakes; the implementer runs the
+  tests itself and reports the output.
+- **Let the implementer verify its own work mechanically** — build, tests,
+  lint — inside its own hop. Validation (§8) is for judgment a second model
+  adds, not for re-running a test suite the implementer could have run.
+- **Brief once, fully.** The expensive failure is a thin brief: the
+  implementer guesses, the validator bounces it, and round 2 costs another
+  two calls. Put the file paths, the acceptance check and the constraints in
+  round 1 (§10).
+- Batch findings: send the implementer **all** validator findings in one
+  hop, never one finding per hop.
+
+Nothing in this config asks for permission — commands are allowed or denied
+(`opencode.jsonc`, `permission`). A denied command comes back as an error. It
+is deliberate: `git push`, recursive deletes and history rewrites are the
+user's to run. Report the exact command for the user to run and carry on;
+never retry it with a rephrased variant to get past the deny.

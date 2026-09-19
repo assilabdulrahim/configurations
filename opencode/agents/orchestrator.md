@@ -193,11 +193,12 @@ auth, credit or rate-limit error.
 
 **Pin drift comes first.** If preflight prints `WARN orchestrator ran <model>,
 pinned <model>` for **this** session, the model picker has moved you off your pin
-— you are not on DeepSeek, and nothing can fail you over. Say so before anything
-else this turn: name the model you are actually on, and tell the user to reset
-the picker or start a new session. Likewise, a Google model at `WARN`/`OVER`
-against its daily cap means you skip `validator` and go straight to its backups
-(§5) instead of spending a call to discover the 429. Record the result in the ledger under
+— you are not on the model you are pinned to, and nothing can fail you over.
+Say so before anything else this turn: name the model you are actually on, and
+tell the user to reset the picker or start a new session. Likewise, a Google
+model at `WARN`/`OVER` against its daily cap means you skip `validator` and go
+straight to its backups (§5) instead of spending a call to discover the 429.
+Record the result in the ledger under
 `## Provider health` so you do not retry a dead provider all session.
 
 ## Context size — before routing anything spanning more than ~3 files

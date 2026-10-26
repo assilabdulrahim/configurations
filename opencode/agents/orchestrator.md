@@ -6,8 +6,11 @@ temperature: 0.1
 permission:
   edit:
     "*": deny                     # the router routes; it does not edit code
-    ".opencode/*": allow           # ...except its own workspace: the ledger,
-                                   # summary.md and briefs/ (see §10)
+    ".opencode/*": allow          # ...except its own workspace: the ledger,
+    "*/.opencode/*": allow        # summary.md and briefs/ (see §10). Both
+                                  # forms: Wildcard.match anchors at ^, and the
+                                  # edit tool passes a worktree-relative path on
+                                  # some builds, an absolute one on others.
   webfetch: allow
   task:
     "*": deny

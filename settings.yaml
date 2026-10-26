@@ -1,18 +1,39 @@
 ### LLM & Encoding settings ###
+# cl100k_base is only the tiktoken tokenizer used for chunk-size counting.
+# It is cached from your previous successful run, so no network fetch is needed.
 encoding_model: cl100k_base
 
-### Model Definitions (Matches your Traceback requirements) ###
+### Model Definitions ###
 completion_models:
   default_completion_model:
-    model_provider: openai          # correct — means "OpenAI-compatible protocol",
-                                    # which is how Ollama exposes its /v1 endpoint
-    model: qwen3-coder-next:latest  # your local 80B MoE — good fit for entity
-                                    # extraction over a code-heavy corpus
-    api_key: ollama                 # dummy value; Ollama ignores it, the field
-                                    # just has to exist. Nothing leaves the machine
-    api_base: http://localhost:11434/v1   # local Ollama — the privacy guarantee
-    concurrency: 1                  # FORCE SERIAL PROCESSING
-    request_timeout: 600.0          # 10 minute timeout per request
+    model_provider: openai            # "OpenAI-compatible protocol" = how Ollama exposes /v1
+    model: qwen3:32b                  # CHANGED from qwen3-coder-next:latest.
+                                      # Reason: Saadeh corpus is Arabic prose, not code.
+                                      # Qwen3 is strong on Arabic and matches your qwen3 embedder/reranker.
+                                      # REQUIRES: `ollama pull qwen3:32b` before launching.
+                                      # No-download fallback: llama3.1:70b (solid, already installed).
+                                      # Arabic specialist (best, but needs GGUF import, not on Ollama): Jais.
+    api_key: ollama                   # dummy; Ollama ignores it. Nothing leaves the machine.
+    api_base: http://localhost:11434/v1
+    concurrency: 1                    # serial — stable on a single local Ollama
+    request_timeout: 1800.0
+    call_args:
+      timeout: 1800
+    retry:
+      type: exponential_backoff
+
+  summarization_model:
+    model_provider: openai
+    model: qwen3:32b
+    api_key: ollama
+    api_base: http://localhost:11434/v1
+    concurrency: 1
+    request_timeout: 1800.0
+    call_args:
+      timeout: 1800
+      max_tokens: 1024
+      temperature: 0.1
+      frequency_penalty: 0.2
     retry:
       type: exponential_backoff
 
@@ -22,14 +43,14 @@ completion_models:
     api_key: ollama
     api_base: http://localhost:11434/v1
     concurrency: 1
-    request_timeout: 600.0
+    request_timeout: 1800.0
     retry:
       type: exponential_backoff
 
 embedding_models:
   default_embedding_model:
     model_provider: openai
-    model: qwen3-embedding:8b
+    model: qwen3-embedding:8b         # confirmed — 4096-dim embeddings
     api_key: ollama
     api_base: http://localhost:11434/v1
     retry:
@@ -38,10 +59,10 @@ embedding_models:
 ### Document processing settings ###
 input:
   type: text
-  base_dir: "input"
-  file_pattern: ".*\\.(cs|js|ts|txt|md|cshtml)"
+  base_dir: "input"                   # put the 477 content*.txt files here
+  file_pattern: ".*\\.txt$$"           # CHANGED from code extensions — Saadeh corpus is .txt only
   recursive: true
-  encoding: utf-8
+  encoding: utf-8                     # correct for Arabic — do not change
 
 chunking:
   type: tokens
@@ -68,18 +89,18 @@ vector_store:
   type: lancedb
   db_uri: "output/lancedb"
 
-### Workflow settings (Mapped to completion_models above) ###
+### Workflow settings ###
 embed_text:
   embedding_model_id: default_embedding_model
 
 extract_graph:
   completion_model_id: default_completion_model
   prompt: "prompts/extract_graph.txt"
-  entity_types: [organization, person, geo, event, software_module]
+  entity_types: [person, organization, geo, event, concept, ideology, group]  # CHANGED for an Arabic philosophy/nationalism corpus (group = peoples/minorities)
   max_gleanings: 1
 
 summarize_descriptions:
-  completion_model_id: default_completion_model
+  completion_model_id: summarization_model
   prompt: "prompts/summarize_descriptions.txt"
   max_length: 500
 
@@ -101,11 +122,12 @@ local_search:
 global_search:
   completion_model_id: answer_model
 
-### Parallelization (Throttled for stability) ###
+### Parallelization (throttled for stability on one local box) ###
 parallelization:
   stagger: 0.5
-  num_threads: 10
+  num_threads: 2
 
 basic_search:
   completion_model_id: answer_model
   embedding_model_id: default_embedding_model
+
